@@ -26,6 +26,11 @@ app.get('/', (req, res) => {
   res.send('AST4 Name Game Backend is running!');
 });
 
+function isWordDuplicate(word, allWords) {
+  const occurrences = allWords.filter(w => w === word).length;
+  return occurrences > 1; // Returns true if the word appears more than once
+}
+
 // Socket.io connection
 io.on("connection", (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
@@ -34,17 +39,16 @@ io.on("connection", (socket) => {
   socket.on("createGame", ({ playerName, categories }, callback) => {
     console.log("🎮 Creating new game:", { playerName, categories });
     const gameId = Math.random().toString(36).substr(2, 9);
+    const hostPlayer = {
+      id: socket.id,
+      name: playerName,
+      score: 0,
+      isHost: true,
+      isReady: true,
+    };
     games[gameId] = {
       id: gameId,
-      players: [
-        {
-          id: socket.id,
-          name: playerName,
-          score: 0,
-          isHost: true,
-          isReady: true,
-        },
-      ],
+      players: [hostPlayer,],
       phase: "lobby",
       categories: categories || [],
       usedLetters: [],
@@ -52,6 +56,7 @@ io.on("connection", (socket) => {
       roundResults: [],
       submissions: {},
       voteLength: 0,
+      nextTurn: hostPlayer,
     };
     
     socket.join(gameId);
@@ -124,11 +129,24 @@ io.on("connection", (socket) => {
       const allSubmissions = [];
       const scores = {};
       game.nameValidations = []; // Initialize name validations
+      const allWords = [];
+            // Loop through all submissions and push words into allWords array
+      for (const submissions of Object.values(game.submissions)) {
+        for (const word of Object.values(submissions)) {
+          if (word) { // Ensure the word is not empty or undefined
+            allWords.push(word);
+          }
+        }
+      }
+
+      console.log("📋 All submitted words:", allWords);
 
       for (const [playerId, submissions] of Object.entries(game.submissions)) {
         let totalPlayerScore = 0;
 
         for (const [category, word] of Object.entries(submissions)) {
+          
+          
           const isValid = word ? true : false; // Replace with actual validation
           validationResults[word] = isValid;
 
@@ -143,7 +161,12 @@ io.on("connection", (socket) => {
             });
           } else {
             // Process other categories
-            const points = isValid ? 10 : 0; // Replace with real scoring logic
+            const isDuplicate = isWordDuplicate(word, allWords);
+
+            // Process other categories
+            const points = isValid ? (isDuplicate ? 5 : 10) : 0; // Assign 5 points for duplicates, 10 otherwise
+            //const points = isValid ? 10 : 0; // Replace with real scoring logic
+
             totalPlayerScore += points;
 
             allSubmissions.push({
@@ -217,6 +240,7 @@ io.on("connection", (socket) => {
       game.nameValidations.forEach(validation => {
         const yesVotes = Object.values(validation.votes).filter(v => v === "yes").length;
         const noVotes = Object.values(validation.votes).filter(v => v === "no").length;
+        const idkVotes = Object.values(validation.votes).filter(v => v === "idk").length;
 
         validation.finalResult = "invalid";
         validation.finalResult = yesVotes > noVotes ? "valid" : "invalid";
@@ -244,6 +268,7 @@ io.on("connection", (socket) => {
       });
 
       game.phase = "results"; // Emit results phase
+      //game.nextTurn = game.players[(game.currentRound) % game.players.length].id;
 
       console.log("✅ Validation complete. Updated scores:", game.players);
 
@@ -271,7 +296,8 @@ io.on("connection", (socket) => {
       }
 
       game.phase = "letter-selection";
-      game.currentRound += 1;
+      //game.currentRound += 1;
+      //game.currentTurn = game.players[(game.currentRound-1) % game.players.length].id; // Set the current turn based on the round number
       /*game.nameValidations = [
 
         {
@@ -313,17 +339,23 @@ io.on("connection", (socket) => {
 
   // Select a letter
   socket.on("selectLetter", ({ gameId, letter }, callback) => {
+    
+    
     console.log("🎯 Letter selected:", { gameId, letter });
+    
     const game = games[gameId];
+    game.currentRound += 1;
+    const nextTurnId = game.players[(game.currentRound) % game.players.length].id;
+    game.nextTurn = game.players.find(player => player.id === nextTurnId);
     if (game) {
       const hostPlayer = game.players.find(player => player.isHost);
-      if (!hostPlayer || hostPlayer.id !== socket.id) {
+      /*if (!hostPlayer || hostPlayer.id !== socket.id) {
         console.error("❌ Unauthorized selectLetter event. Only the host can trigger this action:", socket.id);
         if (typeof callback === "function") {
           callback({ success: false, message: "Only the host can select a letter." });
         }
         return;
-      }
+      }*/
 
       if (game.usedLetters.includes(letter)) {
         console.warn("⚠️ Letter already used:", letter);
