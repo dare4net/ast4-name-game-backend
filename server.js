@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const DictionaryService = require('./utils/dictionary-service');
 
 const app = express();
 const server = http.createServer(app);
@@ -104,7 +105,7 @@ io.on("connection", (socket) => {
   });
 
   // Listen for timerEnd event from the host
-  socket.on("timerEnd", ({ gameId }) => {
+  socket.on("timerEnd", async ({ gameId }) => {
     console.log("⏰ Timer ended for game:", gameId);
     const game = games[gameId];
     if (game.phase !== "playing") {
@@ -138,16 +139,24 @@ io.on("connection", (socket) => {
           }
         }
       }
-
+      // Use DictionaryService to validate words
+      const wordsValidation = await DictionaryService.validateWords(allWords);
       console.log("📋 All submitted words:", allWords);
+      console.log("Validation results:", wordsValidation);
 
       for (const [playerId, submissions] of Object.entries(game.submissions)) {
         let totalPlayerScore = 0;
 
         for (const [category, word] of Object.entries(submissions)) {
-          
-          
-          const isValid = word ? true : false; // Replace with actual validation
+          let isValid = true;
+          if(word[0].toLowerCase() !== game.currentLetter.toLowerCase()){
+            isValid = false;
+          }
+          else{
+            // Validate the word using the DictionaryService
+            isValid = wordsValidation[word] || false; // Use the validation result from DictionaryService
+          }
+          //const isValid = word ? true : false; // Replace with actual validation
           validationResults[word] = isValid;
 
           if (category === "names") {
@@ -156,7 +165,7 @@ io.on("connection", (socket) => {
               word,
               playerId,
               votes: {},
-              aiOpinion: "",
+              aiOpinion: wordsValidation[word] ? "valid" : "invalid", // AI opinion based on validation
               finalResult: "",
             });
           } else {
@@ -206,11 +215,13 @@ io.on("connection", (socket) => {
   });
 
   // Add voteOnName event
-  socket.on("voteOnName", ({ gameId, word, playerId, vote }) => {
-    console.log("📤 Vote received:", { gameId, word, playerId, vote });
+  socket.on("voteOnName", ({ gameId, word, playerId, vote, votedPlayer }) => {
+    console.log("📤 Vote received:", { gameId, word, playerId, vote, votedPlayer });
     const game = games[gameId];
     if (game) {
-      const nameValidation = game.nameValidations.find(validation => validation.word === word);
+      const nameValidation = game.nameValidations.find(p => p.playerId === votedPlayer);
+      //const nameValidation = player.word;
+      //const nameValidation = game.nameValidations.find(validation => validation.word === word);
       if (nameValidation) {
         nameValidation.votes[playerId] = vote;
         console.log("✅ Vote recorded:", nameValidation);
