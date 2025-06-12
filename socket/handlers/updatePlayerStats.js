@@ -1,12 +1,10 @@
 const { games } = require('../store/game.store');
-const submissionQueue = require('../../utils/submission-queue');
 const { isWordDuplicate } = require('../../utils/gameLogic');
 
-// Helper function to update player stats
 const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, submissionTime) => {
   const player = game.players.find(p => p.id === playerId);
   if (!player) return;
-
+  
   // Initialize stats if not exists
   if (!player.stats) {
     player.stats = {
@@ -58,7 +56,7 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
         player.stats.longestWord = { word, length: word.length };
       }
 
-      // Track rare words
+      // Track rare words (not in cache and unique)
       if (!validation.fromCache && !isWordDuplicate(word, Object.values(game.submissions).flatMap(s => Object.values(s)))) {
         player.stats.rareWords.push({ word, category, round: game.currentRound });
       }
@@ -66,24 +64,4 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
   }
 };
 
-const submitWords = (socket, io) => {
-  return async ({ gameId, playerId, submissions }) => {
-    console.log("📤 Handling word submissions:", { gameId, playerId, submissions });
-    const game = games[gameId];
-    
-    if (game) {
-      const submissionTime = Date.now();
-      game.submissions[playerId] = submissions;
-      
-      // Queue the submissions for validation
-      const validatedSubmissions = await submissionQueue.queueSubmission(gameId, playerId, submissions);
-      
-      // Update player stats
-      updatePlayerStats(game, playerId, submissions, validatedSubmissions, submissionTime);
-      
-      console.log(`Player ${playerId} submitted words:`, game.submissions[playerId]);
-    }
-  };
-};
-
-module.exports = submitWords;
+module.exports = updatePlayerStats;

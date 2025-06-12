@@ -1,0 +1,93 @@
+const DictionaryService = require('./dictionary-service');
+
+class SubmissionQueue {
+  constructor() {
+    this.queues = new Map(); // Map<gameId, Map<playerId, Promise<validationResults>>>
+    this.results = new Map(); // Map<gameId, Map<playerId, validatedSubmissions>>
+    this.currentLetters = new Map(); // Map<gameId, string>
+  }
+
+  async queueSubmission(gameId, playerId, submissions) {
+    if (!this.queues.has(gameId)) {
+      this.queues.set(gameId, new Map());
+      this.results.set(gameId, new Map());
+    }
+
+    const gameQueue = this.queues.get(gameId);
+    const gameResults = this.results.get(gameId);
+
+    // Create validation promise for this submission
+    const validationPromise = this.validateSubmissions(submissions, gameId)
+      .then(validatedSubmissions => {
+        gameResults.set(playerId, validatedSubmissions);
+        return validatedSubmissions;
+      })
+      .catch(error => {
+        console.error(`Error validating submissions for player ${playerId} in game ${gameId}:`, error);
+        return null;
+      });
+
+    gameQueue.set(playerId, validationPromise);
+    return validationPromise;
+  }
+
+  async validateSubmissions(submissions, gameId) {
+    const validatedSubmissions = {};
+    const currentLetter = this.currentLetters.get(gameId);
+
+    for (const [category, word] of Object.entries(submissions)) {
+      if (!word) continue;
+
+      try {
+        const validation = await DictionaryService.validateWord(word, category);
+        validatedSubmissions[category] = {
+          word,
+          validation,
+          isStartValid: word[0].toLowerCase() === currentLetter?.toLowerCase()
+        };
+      } catch (error) {
+        console.error(`Error validating word "${word}" for category "${category}":`, error);
+        validatedSubmissions[category] = {
+          word,
+          validation: { isValid: false, extract: "Error during validation" },
+          isStartValid: word[0].toLowerCase() === currentLetter?.toLowerCase()
+        };
+      }
+    }
+
+    return validatedSubmissions;
+  }
+
+  async getGameResults(gameId) {
+    if (!this.queues.has(gameId)) {
+      return null;
+    }
+
+    const gameQueue = this.queues.get(gameId);
+    const gameResults = this.results.get(gameId);
+
+    // Wait for all validations to complete
+    try {
+      await Promise.all(Array.from(gameQueue.values()));
+    } catch (error) {
+      console.error(`Error waiting for validations in game ${gameId}:`, error);
+    }
+
+    return gameResults;
+  }
+
+  clearGame(gameId) {
+    this.queues.delete(gameId);
+    this.results.delete(gameId);
+    this.currentLetters.delete(gameId);
+  }
+
+  setCurrentLetter(gameId, letter) {
+    this.currentLetters.set(gameId, letter);
+  }
+}
+
+// Create a singleton instance
+const submissionQueue = new SubmissionQueue();
+
+module.exports = submissionQueue;

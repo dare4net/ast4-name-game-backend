@@ -1,0 +1,366 @@
+const createGame = require('../handlers/createGame');
+const joinGame = require('../handlers/joinGame');
+const submitWords = require('../handlers/submitWords');
+const selectLetter = require('../handlers/selectLetter');
+const handleVoteOnName = require('../handlers/handleVoteOnName');
+const handleTimerEnd = require('../handlers/handleTimerEnd');
+const completeValidation = require('../handlers/completeValidation');
+
+const startGame = (socket, io) => {
+  return async ({ gameId }, callback) => {
+    console.log("🎮 Starting game:", gameId);
+    const game = games[gameId];
+    
+    if (!game) {
+      console.error("❌ Game not found for start game:", gameId);
+      if (callback) callback({ success: false, message: "Game not found" });
+      return;
+    }
+
+    const hostPlayer = game.players.find(player => player.isHost);
+    if (!hostPlayer || hostPlayer.id !== socket.id) {
+      console.error("❌ Unauthorized startGame event. Only the host can start the game:", socket.id);
+      if (callback) callback({ success: false, message: "Only the host can start the game." });
+      return;
+    }
+
+    game.phase = "letter-selection";
+    console.log("✅ Game started successfully:", game);
+    io.to(gameId).emit("gameStateUpdate", game);
+    if (callback) callback({ success: true });
+  };
+};
+
+const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, submissionTime) => {
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return;
+  // Initialize stats if not exists
+  if (!player.stats) {
+    player.stats = {
+      uniqueWords: 0,
+      fastestSubmissions: 0,
+      fastestSubmission: null, // Track the fastest submission time in seconds
+      rareWords: [],
+      longestWord: { word: '', length: 0 },
+      perfectRounds: 0,
+      submissionTimes: [],
+      allSubmittedWords: new Set() // Track all words submitted by this player
+    };
+  }
+  // Track submission time
+  const submissionTimeInSeconds = (submissionTime - game.roundStartTime) / 1000; // Convert to seconds
+  player.stats.submissionTimes.push(submissionTimeInSeconds);
+  
+  // Update fastest submission if this submission was faster
+  if (!player.stats.fastestSubmission || submissionTimeInSeconds < player.stats.fastestSubmission) {
+    player.stats.fastestSubmission = submissionTimeInSeconds;
+    player.stats.fastestSubmissions++;
+  }
+  
+  // Track all words submitted by the player
+  for (const [category, submission] of Object.entries(validatedSubmissions)) {
+    if (category === 'names') continue;
+    const { word, validation, isStartValid } = submission;
+    if (isStartValid && validation.isValid) {
+      player.stats.allSubmittedWords.add(word.toLowerCase());
+    }
+  }
+  // Track longest word
+  let longestThisRound = { word: '', length: 0 };
+
+  for (const [category, submission] of Object.entries(validatedSubmissions)) {
+    if (category === 'names') continue;
+
+    const { word, validation, isStartValid } = submission;
+    const isValid = isStartValid && validation.isValid;
+
+    if (isValid) {
+      // Update longest word
+      if (word.length > longestThisRound.length) {
+        longestThisRound = { word, length: word.length };
+      }
+      if (word.length > player.stats.longestWord.length) {
+        player.stats.longestWord = { word, length: word.length };
+      }
+
+      // Track rare words (not in cache and unique)
+      if (!validation.fromCache && !isWordDuplicate(word, Object.values(game.submissions).flatMap(s => Object.values(s)))) {
+        player.stats.rareWords.push({ word, category, round: game.currentRound });
+      }
+    }
+  }
+};
+
+const calculateUniqueWords = (game) => {
+  // Create a map to count word occurrences across all players
+  const wordOccurrences = new Map();
+  
+  // Count occurrences of each word across all players
+  game.players.forEach(player => {
+    if (player.stats && player.stats.allSubmittedWords) {
+      Array.from(player.stats.allSubmittedWords).forEach(word => {
+        wordOccurrences.set(word, (wordOccurrences.get(word) || 0) + 1);
+      });
+    }
+  });
+
+  // Update unique word count for each player
+  game.players.forEach(player => {
+    if (player.stats && player.stats.allSubmittedWords) {
+      // Count words that appear only once in the game (unique to this player)
+      player.stats.uniqueWords = Array.from(player.stats.allSubmittedWords)
+        .filter(word => wordOccurrences.get(word) === 1).length;
+    }
+  });
+};
+
+const submitWords = (socket, io) => {
+  return async ({ gameId, playerId, submissions }) => {
+    console.log("📤 Handling word submissions:", { gameId, playerId, submissions });
+    const game = games[gameId];
+    if (game) {
+      const submissionTime = Date.now();
+      game.submissions[playerId] = submissions;
+      
+      // Queue the submissions for validation
+      const validatedSubmissions = await submissionQueue.queueSubmission(gameId, playerId, submissions);
+      
+      // Update player stats
+      updatePlayerStats(game, playerId, submissions, validatedSubmissions, submissionTime);
+      
+      console.log(`Player ${playerId} submitted words:`, game.submissions[playerId]);
+    }
+  };
+};
+
+const handleTimerEnd = (socket, io) => {
+  return async ({ gameId }) => {
+    console.log("⏰ Timer ended for game:", gameId);
+    const game = games[gameId];
+    
+    if (!game || game.phase !== "playing") {
+      console.warn("⚠️ Timer end already processed for this round or game not found.");
+      return;
+    }
+
+    const hostPlayer = game.players.find(player => player.isHost);
+    if (!hostPlayer || hostPlayer.id !== socket.id) {
+      console.error("❌ Unauthorized timerEnd event. Only the host can trigger this action:", socket.id);
+      return;
+    }
+
+    try {
+      // Get all validated submissions
+      const validatedResults = await submissionQueue.getGameResults(gameId);
+      if (!validatedResults) {
+        console.error("❌ No validated results found for game:", gameId);
+        game.phase = "letter-selection";
+        game.currentRound += 1;
+        const nextTurnId = game.players[game.currentRound % game.players.length].id;
+        game.nextTurn = game.players.find(player => player.id === nextTurnId);
+
+        console.log("No Valid Result:", game.players);
+        io.to(game.id).emit("gameStateUpdate", game);
+
+        return;
+      }
+
+      // Process results and calculate scores
+      const allSubmissions = [];
+      const scores = {};
+      game.nameValidations = [];
+
+      // Group words by category for duplicate checking
+      const wordsByCategory = {};
+      for (const [playerId, validatedSubmissions] of validatedResults.entries()) {
+        for (const [category, submission] of Object.entries(validatedSubmissions)) {
+          if (!wordsByCategory[category]) {
+            wordsByCategory[category] = [];
+          }
+          if (submission.word) {
+            wordsByCategory[category].push(submission.word);
+          }
+        }
+      }      // Calculate scores and prepare results
+      for (const [playerId, validatedSubmissions] of validatedResults.entries()) {
+        let totalPlayerScore = 0;
+
+        for (const [category, submission] of Object.entries(validatedSubmissions)) {
+          const { word, validation, isStartValid } = submission;
+          const isValid = isStartValid && validation.isValid;
+
+          if (category === "names") {
+            game.nameValidations.push({
+              word,
+              playerId,
+              votes: {},
+              aiOpinion: validation.isValid ? "valid" : "invalid",
+              finalResult: "",
+              extract: validation.extract || (isStartValid ? "" : "Word does not start with the correct letter")
+            });
+          } else {
+            const isDuplicate = isWordDuplicate(word, wordsByCategory[category]);
+            const points = isValid ? (isDuplicate ? 5 : 10) : 0;
+            totalPlayerScore += points;
+
+            allSubmissions.push({
+              playerId,
+              category,
+              word,
+              isValid,
+              points,
+              extract: validation.extract || (isStartValid ? "" : "Word does not start with the correct letter")
+            });
+          }
+        }          scores[playerId] = totalPlayerScore;
+        const player = game.players.find(p => p.id === playerId);
+        if (player) {
+          player.score += scores[playerId];
+        }
+      }
+
+      const roundResults = {
+        letter: game.currentLetter,
+        submissions: allSubmissions,
+        scores,
+      };
+
+      game.roundResults.push(roundResults);
+      game.voteLength = (game.players.length - 1) * game.nameValidations.length;
+      game.phase = "validation";
+      game.submissions = {};
+
+      // Clear the submission queue for this game
+      submissionQueue.clearGame(gameId);
+
+      // If this was the last round, calculate final unique words
+      const maxRounds = game.players.length * 2; // or whatever your game's max rounds is
+      if (game.currentRound >= maxRounds) {
+        calculateUniqueWords(game);
+        game.phase = "finished";
+      }
+
+      console.log("✅ Round processed successfully for all players:", roundResults);
+      io.to(gameId).emit("gameStateUpdate", game);
+    } catch (error) {
+      console.error("❌ Error processing round results:", error);
+    }
+  };
+};
+
+const handleVoteOnName = (socket, io) => {
+  return ({ gameId, word, playerId, vote, votedPlayer }) => {
+    //console.log("📤 Vote received:", { gameId, word, playerId, vote, votedPlayer });
+    const game = games[gameId];
+    
+    if (!game) {
+      console.error("❌ Game not found for voteOnName:", gameId);
+      return;
+    }
+
+    const nameValidation = game.nameValidations.find(p => p.playerId === votedPlayer);
+    if (nameValidation) {
+      nameValidation.votes[playerId] = vote;
+      //console.log("✅ Vote recorded:", nameValidation);
+      io.to(gameId).emit("gameStateUpdate", game);
+    } else {
+      console.warn("⚠️ Name not found for validation:", word);
+    }
+
+    totalVotes++;
+    if (totalVotes === game.voteLength) {
+      completeValidation(game, io);
+      totalVotes = 0;
+    }
+  };
+};
+
+const completeValidation = (game, io) => {
+  console.log("📤 Validation complete for game:", game.id);
+  const roundResult = game.roundResults[game.roundResults.length - 1];
+  game.nameValidations.forEach(validation => {
+    const yesVotes = Object.values(validation.votes).filter(v => v === "yes").length;
+    const noVotes = Object.values(validation.votes).filter(v => v === "no").length;
+
+    validation.finalResult = yesVotes > noVotes ? "valid" : "invalid";
+
+    const player = game.players.find(p => p.id === validation.playerId);
+    const points = validation.finalResult === "valid" ? 10 : 0;
+    
+    // Update both player's total score and the round's score
+    if (points > 0) {
+      player.score += points;
+      roundResult.scores[validation.playerId] = (roundResult.scores[validation.playerId] || 0) + points;
+    }
+
+    roundResult.submissions.push({
+      category: "names",
+      isValid: validation.finalResult === "valid",
+      playerId: validation.playerId,
+      points,
+      word: validation.word,
+    });
+  });
+  game.phase = "results";
+  game.currentRound += 1;
+  const nextTurnId = game.players[game.currentRound % game.players.length].id;
+  game.nextTurn = game.players.find(player => player.id === nextTurnId);  console.log("✅ Validation complete. Updated scores:", game.players);
+  // First, emit game state with round results
+  io.to(game.id).emit("gameStateUpdate", game);
+  // Then update player stats after the initial emit - check roundResult scores
+  const maxPossibleScore = (game.categories.length * 10); // 10 points per category + 10 for name
+  Object.entries(roundResult.scores).forEach(([playerId, score]) => {
+    const player = game.players.find(p => p.id === playerId);
+    if (player && score === maxPossibleScore) {
+      if (!player.stats) player.stats = { perfectRounds: 0 };
+      player.stats.perfectRounds = (player.stats.perfectRounds || 0) + 1;
+      console.log(`✅ Player ${player.name} achieved a perfect round!`);
+      console,log(`player scored ${score} points in this round out of ${maxPossibleScore}`);
+    }
+  });
+
+  // Re-emit game state with updated stats
+  console.log("✅ Player stats updated");
+  io.to(game.id).emit("gameStateUpdate", game);
+  console.log("✅ Game state re-updated after validation complete:", game);
+};
+
+const selectLetter = (socket, io) => {
+  return ({ gameId, letter }, callback) => {
+    console.log("🎯 Letter selected:", { gameId, letter });
+    const game = games[gameId];
+    
+    if (game) {
+      if (game.usedLetters.includes(letter)) {
+        console.warn("⚠️ Letter already used:", letter);
+        if (callback) callback({ success: false, message: "Letter already used." });
+        return;
+      }      game.usedLetters.push(letter);
+      game.currentLetter = letter;
+      game.phase = "playing";
+      game.roundStartTime = Date.now(); // Add round start timestamp
+      
+      // Set the current letter in the submission queue
+      submissionQueue.setCurrentLetter(gameId, letter);
+
+      console.log("✅ Letter selected successfully:", game);
+
+      io.to(gameId).emit("timerUpdate", 30);
+      io.to(gameId).emit("gameStateUpdate", game);
+      if (callback) callback({ success: true });
+    } else {
+      console.error("❌ Game not found for selectLetter:", gameId);
+      if (callback) callback({ success: false, message: "Game not found." });
+    }
+  };
+};
+
+module.exports = {
+  createGame,
+  joinGame,
+  startGame,
+  submitWords,
+  handleTimerEnd,
+  handleVoteOnName,
+  selectLetter,
+}; 
