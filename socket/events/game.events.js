@@ -6,6 +6,9 @@ const handleVoteOnName = require('../handlers/handleVoteOnName');
 const handleTimerEnd = require('../handlers/handleTimerEnd');
 const completeValidation = require('../handlers/completeValidation');
 const startGame = require('../handlers/startGame');
+const transferHostTitle = require('../handlers/transferHostTitle');
+const removePlayer = require('../handlers/removePlayer');
+const interruptVoting = require('../handlers/interruptVoting');
 
 module.exports = {
   createGame,
@@ -15,4 +18,7 @@ module.exports = {
   handleTimerEnd,
   handleVoteOnName,
   selectLetter,
+  transferHostTitle,
+  removePlayer,
+  interruptVoting,
 };

@@ -1,4 +1,5 @@
 const { games } = require('../store/game.store');
+const { trackPlayerSession } = require('../store/player.store');
 
 const createGame = (socket, io) => {
   return async ({ gameId, playerName, categories }, callback) => {
@@ -33,6 +34,12 @@ const createGame = (socket, io) => {
       voteLength: 0,
       nextTurn: hostPlayer,
     };
+
+    trackPlayerSession(socket.id, {
+        gameId,
+        playerName,
+        isHost: true
+      });
     
     socket.join(gameId);
     console.log("✅ Game created successfully:", games[gameId]);

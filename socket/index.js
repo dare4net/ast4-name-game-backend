@@ -21,7 +21,12 @@ const initializeSocket = (server) => {
     socket.on("submitWords", gameEvents.submitWords(socket, io));
     socket.on("timerEnd", gameEvents.handleTimerEnd(socket, io));
     socket.on("voteOnName", gameEvents.handleVoteOnName(socket, io));
-    socket.on("selectLetter", gameEvents.selectLetter(socket, io));    // Register chat and room events
+    socket.on("selectLetter", gameEvents.selectLetter(socket, io));
+    socket.on("transferHostTitle", gameEvents.transferHostTitle(socket, io));
+    socket.on("removePlayer", gameEvents.removePlayer(socket, io));
+    socket.on("interruptVoting", gameEvents.interruptVoting(socket, io));
+
+    // Register chat and room events
     socket.on("chatMessage", chatEvents.handleChatMessage(socket, io));
     socket.on("joinRoom", roomEvents.handleJoinRoom(socket, io));
     socket.on("leaveRoom", roomEvents.handleLeaveRoom(socket, io));
