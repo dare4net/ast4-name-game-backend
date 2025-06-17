@@ -21,7 +21,7 @@ const selectLetter = (socket, io) => {
       // Set the current letter in the submission queue
       submissionQueue.setCurrentLetter(gameId, letter);
 
-      console.log("✅ Letter selected successfully:", game);
+      console.log("✅ Letter selected successfully:", game.id);
 
       io.to(gameId).emit("timerUpdate", 30);
       io.to(gameId).emit("gameStateUpdate", game);

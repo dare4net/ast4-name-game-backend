@@ -117,7 +117,7 @@ const handleTimerEnd = (socket, io) => {
         game.phase = "finished";
       }
 
-      console.log("✅ Round processed successfully for all players:", roundResults);
+      console.log("✅ Round processed successfully for all players:", roundResults.letter);
       io.to(gameId).emit("gameStateUpdate", game);
     } catch (error) {
       console.error("❌ Error processing round results:", error);

@@ -44,6 +44,7 @@ function transferHostTitle(socket, io) {
 
       // Broadcast updated game state to all players
       io.to(gameId).emit('gameStateUpdate', updatedGame);
+      io.to(gameId).emit('hostTransfer', { newHostId });
 
       console.log(`✨ Host title transferred from ${socket.id} to ${newHostId}`);
     } catch (error) {

@@ -15,7 +15,7 @@ const handleVoteOnName = (socket, io) => {
     const nameValidation = game.nameValidations.find(p => p.playerId === votedPlayer);
     if (nameValidation) {
       nameValidation.votes[playerId] = vote;
-      console.log("✅ Vote recorded:", nameValidation);
+      console.log("✅ Vote recorded:", nameValidation.word, "by player:", playerId, "vote:", vote);
       io.to(gameId).emit("gameStateUpdate", game);
     } else {
       console.warn("⚠️ Name not found for validation:", word);

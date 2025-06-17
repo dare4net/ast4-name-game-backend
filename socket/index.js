@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const gameEvents = require('./events/game.events');
 const chatEvents = require('./events/chat.events');
 const roomEvents = require('./events/room.events');
+const logger = require('../config/logger');
 
 const initializeSocket = (server) => {
   const io = new Server(server, {
@@ -12,6 +13,7 @@ const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
+    logger.info(`User connected`, { socketId: socket.id });
     console.log(`🔌 User connected: ${socket.id}`);
 
     // Register game events
@@ -31,7 +33,9 @@ const initializeSocket = (server) => {
     socket.on("joinRoom", roomEvents.handleJoinRoom(socket, io));
     socket.on("leaveRoom", roomEvents.handleLeaveRoom(socket, io));
 
-    socket.on("disconnect", () => {
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      logger.info(`User disconnected`, { socketId: socket.id });
       console.log(`🔌 User disconnected: ${socket.id}`);
       // TODO: Handle player disconnection
     });

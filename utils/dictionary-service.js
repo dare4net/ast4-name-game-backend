@@ -173,7 +173,7 @@ class DictionaryService {
 
       // Cache the result with category
       this.cache.set(cacheKey, result);
-      console.log(`Validation result for "${normalizedWord}" in category "${category}":`, result);
+      console.log(`Validation result for "${normalizedWord}" in category "${category}":`, result.isValid);
 
       return result;
     } catch (error) {

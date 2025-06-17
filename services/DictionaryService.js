@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const logger = require('../config/logger');
 
 class DictionaryService {
   static API_BASE = "https://en.wiktionary.org/w/api.php?action=query&format=json&prop=extracts&titles";
@@ -14,87 +15,60 @@ class DictionaryService {
   };
 
   static async validateWord(word, category) {
-    if (!word || word.trim().length === 0) return { isValid: false, extract: '' };
-
     const normalizedWord = word.toLowerCase().trim();
-    const cacheKey = `${normalizedWord}-${category}`;
+    const cacheKey = `${category}:${normalizedWord}`;
 
-    // Check cache first
     if (this.cache.has(cacheKey)) {
-      console.log(`Cache hit for "${normalizedWord}" in category "${category}":`, this.cache.get(cacheKey));
+      logger.debug('Dictionary cache hit', {
+        word: normalizedWord,
+        category,
+        result: this.cache.get(cacheKey)
+      });
       return this.cache.get(cacheKey);
     }
 
+    logger.debug('Validating word', {
+      word: normalizedWord,
+      category
+    });
+
     try {
-      console.log(`Validating word: "${normalizedWord}" for category "${category}"`);
-      const response = await fetch(`${this.API_BASE}=${encodeURIComponent(normalizedWord)}`, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
+      const response = await fetch(`${this.apiUrl}/word/${normalizedWord}`);
+      
+      logger.debug('Dictionary API response', {
+        word: normalizedWord,
+        status: response.status,
+        ok: response.ok
       });
 
-      console.log(`API Response for "${normalizedWord}":`, response.status, response.ok);
-
-      let result = { isValid: false, extract: '' };
-
       if (response.ok) {
-        try {
-          const data = await response.json();
-          console.log(`API Data for "${normalizedWord}":`, data);
+        const data = await response.json();
+        logger.debug('Dictionary API data received', {
+          word: normalizedWord,
+          data
+        });
 
-          if (data.query?.pages) {
-            const pageId = Object.keys(data.query.pages)[0];
-            const page = data.query.pages[pageId];
-            
-            if (pageId !== "-1" && page.extract) {
-              const extract = page.extract.toLowerCase();
-              result.extract = extract;
-
-              // Special handling for names category
-              if (category === 'names') {
-                // For names, check if it's mentioned as a given name, personal name, etc.
-                result.isValid = extract.includes('given name') || 
-                                extract.includes('personal name') || 
-                                extract.includes('proper name') ||
-                                extract.includes('first name') ||
-                                extract.includes('surname');
-              } 
-              // For other categories, check for category-specific keywords
-              else if (this.CATEGORY_KEYWORDS[category]) {
-                result.isValid = this.CATEGORY_KEYWORDS[category].some(keyword => 
-                  extract.includes(keyword)
-                );
-              }
-              // If no category keywords found but the word exists, be lenient
-              else {
-                result.isValid = true;
-              }
-            }
-          }
-        } catch (jsonError) {
-          console.error(`JSON parse error for "${normalizedWord}":`, jsonError);
-        }
-      } else {
-        // API error - be lenient and check if word looks reasonable
-        console.warn(`API error for "${normalizedWord}":`, response.status);
-        result.isValid = this.isReasonableWord(normalizedWord);
+        // Process validation logic
+        const result = this.processValidation(data, category);
+        
+        // Cache the result
+        this.cache.set(cacheKey, result);
+        
+        logger.info('Word validation complete', {
+          word: normalizedWord,
+          category,
+          isValid: result
+        });
+        
+        return result;
       }
-
-      // Cache the result with category
-      this.cache.set(cacheKey, result);
-      console.log(`Validation result for "${normalizedWord}" in category "${category}":`, result);
-
-      return result;
+      return false;
     } catch (error) {
-      console.error(`Network error validating "${normalizedWord}":`, error);
-      // If API fails completely, be lenient and assume word is valid if it's reasonable
-      const result = {
-        isValid: this.isReasonableWord(normalizedWord),
-        extract: ''
-      };
-      this.cache.set(cacheKey, result);
-      return result;
+      logger.error('Dictionary API error', {
+        word: normalizedWord,
+        error: error.message
+      });
+      return false;
     }
   }
 
@@ -106,7 +80,7 @@ class DictionaryService {
   static async validateWords(words, category) {
     const results = {};
 
-    console.log(`Validating words for category "${category}":`, words);
+    logger.info(`Validating words for category "${category}":`, words);
 
     // Filter out empty words
     const validWords = words.filter((word) => word && word.trim().length > 0);
@@ -124,7 +98,7 @@ class DictionaryService {
         // Small delay to be nice to the API
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error validating word "${word}":`, error);
+        logger.error(`Error validating word "${word}":`, error);
         results[word] = {
           isValid: this.isReasonableWord(word.toLowerCase().trim()),
           extract: ''
@@ -132,7 +106,7 @@ class DictionaryService {
       }
     }
 
-    console.log(`Final validation results for category "${category}":`, results);
+    logger.info(`Final validation results for category "${category}":`, results);
     return results;
   }
 

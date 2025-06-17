@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const initializeSocket = require('./socket');
 const { games } = require('./socket/store/game.store');
+const logger = require('./config/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,13 +14,14 @@ app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
+  logger.info('Health check endpoint accessed');
   res.send('AST4 Name Game Backend is running!');
 });
 
 // Game state API endpoint
 app.get('/api/games/:id', (req, res) => {
   const { id } = req.params;
-  console.log('🎮 Fetching game state:', { 
+  logger.debug('Fetching game state', { 
     requestedId: id,
     availableGames: Object.keys(games),
     gameExists: !!games[id]
@@ -28,7 +30,7 @@ app.get('/api/games/:id', (req, res) => {
   const game = games[id];
   
   if (!game) {
-    console.log('❌ Game not found:', id);
+    logger.warn('Game not found', { id });
     return res.status(404).json({ error: 'Game not found' });
   }
 
@@ -55,5 +57,5 @@ const io = initializeSocket(server);
 // Start the server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`);
 });

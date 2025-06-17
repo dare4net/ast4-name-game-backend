@@ -19,7 +19,7 @@ const startGame = (socket, io) => {
     }
 
     game.phase = "letter-selection";
-    console.log("✅ Game started successfully:", game);
+    console.log("✅ Game started successfully:", game.id);
     io.to(gameId).emit("gameStateUpdate", game);
     if (callback) callback({ success: true });
   };
