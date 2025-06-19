@@ -3,7 +3,7 @@ const { getPlayerSession } = require('../store/player.store');
 const completeValidation = require('./completeValidation');
 
 function interruptVoting(socket, io) {
-  return ({ gameId }) => {
+  return ({ gameId, playerId }) => {
     try {
       const game = games[gameId];
       if (!game) {
@@ -12,7 +12,7 @@ function interruptVoting(socket, io) {
         return;
       }
 
-      const currentPlayer = getPlayerSession(socket.id);
+      const currentPlayer = getPlayerSession(playerId || socket.id);
       if (!currentPlayer?.isHost) {
         console.log(`❌ Non-host player trying to interrupt voting: ${socket.id}`);
         socket.emit('error', { message: 'Only the host can interrupt voting' });

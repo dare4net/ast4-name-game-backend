@@ -12,7 +12,10 @@ const selectLetter = (socket, io) => {
         if (callback) callback({ success: false, message: "Letter already used." });
         return;
       }
-
+      game.players.forEach(player => {
+      player.isReady = true; // Ensure all players are marked as ready
+      player.hasSubmitted = false; // Reset submission status for the new game
+    });
       game.usedLetters.push(letter);
       game.currentLetter = letter;
       game.phase = "playing";

@@ -6,7 +6,7 @@ const { trackPlayerSession } = require('../store/player.store');
 const RESTRICTED_PHASES = ['playing', 'validation', 'letter-selection'];
 
 const joinGame = (socket, io) => {
-  return async ({ gameId, playerName }, callback) => {
+  return async ({ gameId, playerName, player }, callback) => {
     console.log("👤 Joining game:", { gameId, playerName });
     
     try {
@@ -45,25 +45,54 @@ const joinGame = (socket, io) => {
         return;
       }
 
+      // Check if player with this id already exists (persistent id)
+      const existingPlayer = game.players.find(p => p.id === player.id);
+      if (existingPlayer) {
+        // Treat as reconnection: update socket, rename if needed
+        existingPlayer.socketId = socket.id;
+        if (playerName && playerName !== existingPlayer.name) {
+          existingPlayer.name = playerName;
+        }
+        trackPlayerSession(existingPlayer.id, {
+          gameId,
+          playerName: existingPlayer.name,
+
+          isHost: existingPlayer.isHost,
+          socketId: socket.id,
+        });
+        socket.join(gameId);
+        io.to(gameId).emit("gameStateUpdate", game);
+        callback({
+          success: true,
+          message: "Reconnected to game (id exists)",
+          isReconnection: true,
+          player: existingPlayer,
+          gameState: game
+        });
+        return;
+      }
+
       // If we get here, it's a new player joining
       const newPlayer = {
-        id: socket.id,
-        name: playerName,
-        score: 0,
+        ...player,
         isHost: false,
         isReady: true,
-        status: "active"
+        status: "active",
+        hasSubmitted: false,
+        socketId: socket.id,
       };
-
+      const playerId = newPlayer.id;
       // Add player to game
       game.players.push(newPlayer);
       socket.join(gameId);
 
       // Track the session
-      trackPlayerSession(socket.id, {
+      trackPlayerSession(playerId, {
         gameId,
         playerName,
-        isHost: false
+        playerId: newPlayer.id, // Use the player's persistent id
+        isHost: false,
+        socketId: socket.id
       });
 
       console.log("✅ Player joined successfully:", newPlayer);

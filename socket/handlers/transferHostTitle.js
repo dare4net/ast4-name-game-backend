@@ -2,7 +2,7 @@ const { games, getGame, updateGameState } = require('../store/game.store');
 const { getPlayerSession, trackPlayerSession } = require('../store/player.store');
 
 function transferHostTitle(socket, io) {
-  return async ({ gameId, newHostId }) => {
+  return async ({ gameId, newHostId, playerId }) => {
     try {
       const game = getGame(gameId);
       if (!game) {
@@ -11,9 +11,9 @@ function transferHostTitle(socket, io) {
         return;
       }
 
-      const currentPlayer = getPlayerSession(socket.id);
+      const currentPlayer = getPlayerSession(playerId);
       if (!currentPlayer?.isHost) {
-        console.log(`❌ Non-host player trying to transfer host title: ${socket.id}`);
+        console.log(`❌ Non-host player trying to transfer host title: ${playerId}`);
         socket.emit('error', { message: 'Only the host can transfer host title' });
         return;
       }
@@ -24,9 +24,10 @@ function transferHostTitle(socket, io) {
         socket.emit('error', { message: 'Target player not found' });
         return;
       }
+      
 
       // Update session tracking
-      trackPlayerSession(socket.id, { ...currentPlayer, isHost: false });
+      trackPlayerSession(playerId, { ...currentPlayer, isHost: false });
       trackPlayerSession(newHostId, { ...newHostPlayer, isHost: true });
 
       // Update game state

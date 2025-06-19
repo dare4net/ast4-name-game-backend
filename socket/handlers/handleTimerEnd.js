@@ -8,16 +8,20 @@ const handleTimerEnd = (socket, io) => {
     console.log("⏰ Timer ended for game:", gameId);
     const game = games[gameId];
     
+    // Notify all clients to stop their timers
+    io.to(gameId).emit("stopTimer");
+
     if (!game || game.phase !== "playing") {
       console.warn("⚠️ Timer end already processed for this round or game not found.");
       return;
     }
+    game.phase = "validation";
 
-    const hostPlayer = game.players.find(player => player.isHost);
+    /*const hostPlayer = game.players.find(player => player.isHost);
     if (!hostPlayer || hostPlayer.id !== socket.id) {
       console.error("❌ Unauthorized timerEnd event. Only the host can trigger this action:", socket.id);
       return;
-    }
+    }*/
 
     try {
       // Get all validated submissions
@@ -26,6 +30,12 @@ const handleTimerEnd = (socket, io) => {
         console.error("❌ No validated results found for game:", gameId);
         game.phase = "letter-selection";
         game.currentRound += 1;
+          // If this was the last round.
+        const maxRounds = game.maxRound // or whatever your game's max rounds is
+        if (game.currentRound >= maxRounds) {
+        //calculateUniqueWords(game);
+        game.phase = "finished";
+        }
         const nextTurnId = game.players[game.currentRound % game.players.length].id;
         game.nextTurn = game.players.find(player => player.id === nextTurnId);
 
@@ -111,11 +121,11 @@ const handleTimerEnd = (socket, io) => {
       submissionQueue.clearGame(gameId);
 
       // If this was the last round, calculate final unique words
-      const maxRounds = game.players.length * 2; // or whatever your game's max rounds is
+      /*const maxRounds = game.players.length * 2; // or whatever your game's max rounds is
       if (game.currentRound >= maxRounds) {
         calculateUniqueWords(game);
         game.phase = "finished";
-      }
+      }*/
 
       console.log("✅ Round processed successfully for all players:", roundResults.letter);
       io.to(gameId).emit("gameStateUpdate", game);

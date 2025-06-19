@@ -29,12 +29,20 @@ const completeValidation = (game, io) => {
   });
   game.phase = "results";
   game.currentRound += 1;
+  // If this was the last round.
+      const maxRounds = game.maxRound // or whatever your game's max rounds is
+      if (game.currentRound >= maxRounds) {
+        //calculateUniqueWords(game);
+        game.phase = "finished";
+      }
+
   const nextTurnId = game.players[game.currentRound % game.players.length].id;
   game.nextTurn = game.players.find(player => player.id === nextTurnId);
   console.log("✅ Validation complete. Updated scores:", game.players);
   
   // First, emit game state with round results
   io.to(game.id).emit("gameStateUpdate", game);
+        
   
   // Then update player stats after the initial emit - check roundResult scores
   const maxPossibleScore = (game.selectedCategories.length * 10); // 10 points per category + 10 for name
