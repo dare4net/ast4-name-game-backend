@@ -1,5 +1,9 @@
 const { games } = require('../store/game.store');
 const { trackPlayerSession } = require('../store/player.store');
+const {
+  saveInitialGameStateToMongo,
+  saveGameStateToRedis
+} = require('../../services/gameStateService');
 
 const createGame = (socket, io) => {
   return async ({ gameId, playerName, categories, player }, callback) => {
@@ -22,7 +26,7 @@ const createGame = (socket, io) => {
     const playerId = hostPlayer.id;
     
     // Create game state with the provided gameId
-    games[gameId] = {
+    const gameState = {
       id: gameId,
       players: [hostPlayer],
       phase: "lobby", 
@@ -36,6 +40,18 @@ const createGame = (socket, io) => {
       nextTurn: hostPlayer,
       maxround: 26,
     };
+    games[gameId] = gameState;
+
+    // Save initial state to MongoDB and Redis
+    try {
+      //await saveInitialGameStateToMongo(gameId, gameState);
+      //await saveGameStateToRedis(gameId, gameState);
+      saveInitialGameStateToMongo(gameId, gameState);
+      saveGameStateToRedis(gameId, gameState);
+      console.log("✅ Initial game state saved to MongoDB and Redis");
+    } catch (err) {
+      console.error("❌ Failed to save initial game state to MongoDB/Redis:", err);
+    }
 
     trackPlayerSession(playerId, {
         gameId,

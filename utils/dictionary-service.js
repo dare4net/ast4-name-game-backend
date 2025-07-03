@@ -1,8 +1,9 @@
 //const fetch = require('node-fetch');
+const redis = require('./redis-client');
 
 class DictionaryService {
   static API_BASE = "https://en.wiktionary.org/w/api.php";
-  static cache = new Map(); // Format: Map<`${word}-${category}`, {isValid: boolean, wikitext: string}>
+  static WORDS_LIBRARY_API = "https://words-library.vercel.app/api";
   static CATEGORY_KEYWORDS = {
     animals: [
       // General animal terms
@@ -85,17 +86,72 @@ class DictionaryService {
            wikitext.includes('===proper noun===');
   }
 
+  static async getCache(cacheKey) {
+    try {
+      const value = await redis.get(`dict:${cacheKey}`);
+      if (value !== null && value !== undefined) {
+        console.log(`[DictionaryService][Redis] Cache hit for ${cacheKey}`);
+        return { isValid: value === 'true', extract: '' };
+      }
+      return null;
+    } catch (err) {
+      console.error(`[DictionaryService][Redis] Error getting cache for ${cacheKey}:`, err);
+      return null;
+    }
+  }
+
+  static async setCache(cacheKey, isValid) {
+    try {
+      await redis.set(`dict:${cacheKey}`, isValid ? 'true' : 'false', { ex: 60 * 60 * 24 }); // 24h expiry
+      console.log(`[DictionaryService][Redis] Cache set for ${cacheKey}:`, isValid);
+    } catch (err) {
+      console.error(`[DictionaryService][Redis] Error setting cache for ${cacheKey}:`, err);
+    }
+  }
+
   static async validateWord(word, category) {
     if (!word || word.trim().length === 0) return { isValid: false, extract: '' };
 
     const normalizedWord = word.toLowerCase().trim();
     const cacheKey = `${normalizedWord}-${category}`;
 
-    // Check cache first
-    if (this.cache.has(cacheKey)) {
-      console.log(`Cache hit for "${normalizedWord}" in category "${category}":`, this.cache.get(cacheKey));
-      return this.cache.get(cacheKey);
-    }    try {
+    // Check Redis cache first
+    const cached = await this.getCache(cacheKey);
+    if (cached) {
+
+    return { isValid: true, extract: '' };;
+    }
+
+    // 1. Try the new Words Library API first
+    try {
+      const wlUrl = `${this.WORDS_LIBRARY_API}/${category}/${normalizedWord}`;
+      console.log('[DictionaryService] Fetching Words Library API:', wlUrl);
+      const wlRes = await fetch(wlUrl);
+      console.log('[DictionaryService] Words Library API status:', wlRes.status);
+      if (wlRes.ok) {
+        const wlData = await wlRes.json();
+        console.log('[DictionaryService] Words Library API response', { word: normalizedWord, category, wlData });
+        if (typeof wlData.exists === 'boolean') {
+          await this.setCache(cacheKey, wlData.exists);
+          if (wlData.exists) {
+            return { isValid: true, extract: '' };
+          } else {
+            console.log('[DictionaryService] Word not found in Words Library API, falling back to Wiktionary', { word: normalizedWord, category });
+            // fall through to Wiktionary
+          }
+        } else {
+          console.log('[DictionaryService] Words Library API did not return expected format', wlData);
+        }
+      } else {
+        console.log('[DictionaryService] Words Library API request failed', wlRes.status, wlRes.statusText);
+      }
+    } catch (error) {
+      console.log('[DictionaryService] Words Library API error', { word: normalizedWord, error: error.message });
+      // fall through to Wiktionary
+    }
+
+    // 2. Fallback to Wiktionary API (existing logic)
+    try {
       console.log(`Validating word: "${normalizedWord}" for category "${category}"`);
       const params = new URLSearchParams({
         action: 'parse',
@@ -104,23 +160,28 @@ class DictionaryService {
         format: 'json',
         origin: '*'
       });
-      
-      const response = await fetch(`${this.API_BASE}?${params}`, {
+      const wiktionaryUrl = `${this.API_BASE}?${params}`;
+      console.log('[DictionaryService] Fetching Wiktionary API:', wiktionaryUrl);
+      const response = await fetch(wiktionaryUrl, {
         method: "GET",
         headers: {
           'Accept': "application/json",
           'Content-Type': 'application/json',
         },
       });
-
-      let result = { isValid: false, extract: '' };
-
+      let isValid = false;
+      let extract = '';
+      console.log('[DictionaryService] Dictionary API response', {
+        word: normalizedWord,
+        status: response.status,
+        ok: response.ok
+      });
       if (response.ok) {
         try {
           const data = await response.json();
           if (data.parse?.wikitext?.['*']) {
             const wikitext = data.parse.wikitext['*'].toLowerCase();
-            result.extract = wikitext;
+            extract = wikitext;
 
             // First check if it's an English word
             /*if (!this.isEnglishWord(wikitext)) {
@@ -132,34 +193,34 @@ class DictionaryService {
 
             // Special handling for names category
             if (category === 'names') {
-              result.isValid = true; // If we got here, the word exists in dictionary
+              isValid = true; // If we got here, the word exists in dictionary
             }
             // For 'things' category - validate if it has Noun section OR contains category keyword
             else if (category === 'things') {
               const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
               const isNoun = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
-              result.isValid = isNoun || hasKeyword;
+              isValid = isNoun || hasKeyword;
             }
             // For 'animals' category - strict validation requiring BOTH category keyword AND Noun section
             else if (category === 'animals') {
               const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
               const isNoun = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
-              result.isValid = hasKeyword && isNoun;
+              isValid = hasKeyword && isNoun;
             }
             // For 'places' category - only check category keywords
             else if (category === 'places') {
-              result.isValid = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
+              isValid = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
             }
             // For other categories, keep existing behavior
             else if (this.CATEGORY_KEYWORDS[category]) {
               const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
               const isNoun = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
-              result.isValid = hasKeyword && isNoun;
+              isValid = hasKeyword && isNoun;
             }
             // If no category keywords found but the word exists and has a noun section, be lenient
             else {
               //result.isValid = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
-              result.isValid = false; // Default to false if no category keywords are defined
+              isValid = false; // Default to false if no category keywords are defined
             }
           }
         } catch (jsonError) {
@@ -168,23 +229,16 @@ class DictionaryService {
       } else {
         // API error - be lenient and check if word looks reasonable
         console.warn(`API error for "${normalizedWord}":`, response.status);
-        result.isValid = this.isReasonableWord(normalizedWord);
+        isValid = this.isReasonableWord(normalizedWord);
       }
-
-      // Cache the result with category
-      this.cache.set(cacheKey, result);
-      console.log(`Validation result for "${normalizedWord}" in category "${category}":`, result.isValid);
-
-      return result;
+      await this.setCache(cacheKey, isValid);
+      console.log(`Validation result for "${normalizedWord}" in category "${category}":`, isValid);
+      return { isValid, extract };
     } catch (error) {
       console.error(`Network error validating "${normalizedWord}":`, error);
-      // If API fails completely, be lenient and assume word is valid if it's reasonable
-      const result = {
-        isValid: this.isReasonableWord(normalizedWord),
-        extract: ''
-      };
-      this.cache.set(cacheKey, result);
-      return result;
+      const isValid = this.isReasonableWord(normalizedWord);
+      // Do not cache network errors
+      return { isValid, extract: '' };
     }
   }
 
@@ -227,7 +281,7 @@ class DictionaryService {
   }
 
   static clearCache() {
-    this.cache.clear();
+    // Optionally clear Redis cache for all dict:* keys (not implemented here)
   }
 
   // Helper method to get category keywords

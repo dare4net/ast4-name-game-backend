@@ -1,8 +1,9 @@
 const { games } = require('../store/game.store');
 const submissionQueue = require('../../utils/submission-queue');
+const { saveGameStateToRedis } = require('../../services/gameStateService');
 
 const selectLetter = (socket, io) => {
-  return ({ gameId, letter }, callback) => {
+  return async ({ gameId, letter }, callback) => {
     console.log("🎯 Letter selected:", { gameId, letter });
     const game = games[gameId];
     
@@ -13,9 +14,9 @@ const selectLetter = (socket, io) => {
         return;
       }
       game.players.forEach(player => {
-      player.isReady = true; // Ensure all players are marked as ready
-      player.hasSubmitted = false; // Reset submission status for the new game
-    });
+        player.isReady = true; // Ensure all players are marked as ready
+        player.hasSubmitted = false; // Reset submission status for the new game
+      });
       game.usedLetters.push(letter);
       game.currentLetter = letter;
       game.phase = "playing";
@@ -23,6 +24,11 @@ const selectLetter = (socket, io) => {
       
       // Set the current letter in the submission queue
       submissionQueue.setCurrentLetter(gameId, letter);
+
+      // Save updated state to Redis
+      //await saveGameStateToRedis(gameId, game);
+       saveGameStateToRedis(gameId, game);
+      console.log("✅ Game state updated in Redis (selectLetter)");
 
       console.log("✅ Letter selected successfully:", game.id);
 

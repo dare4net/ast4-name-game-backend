@@ -1,4 +1,5 @@
 const { games } = require('../store/game.store');
+const { saveGameStateToRedis } = require('../../services/gameStateService');
 
 const startGame = (socket, io) => {
   return async ({ gameId, playerId }, callback) => {
@@ -23,6 +24,16 @@ const startGame = (socket, io) => {
       player.hasSubmitted = false; // Reset submission status for the new game
     });
     game.phase = "letter-selection";
+
+    // Save updated state to Redis
+    try {
+      //await saveGameStateToRedis(gameId, game);
+      saveGameStateToRedis(gameId, game);
+      console.log("✅ Game state updated in Redis (startGame)");
+    } catch (err) {
+      console.error("❌ Failed to update game state in Redis (startGame):", err);
+    }
+
     console.log("✅ Game started successfully:", game.id);
     io.to(gameId).emit("gameStateUpdate", game);
     if (callback) callback({ success: true });

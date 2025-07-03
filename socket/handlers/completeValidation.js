@@ -1,7 +1,12 @@
 const { games } = require('../store/game.store');
 const DictionaryService = require('../../utils/dictionary-service');
+const {
+  getGameStateFromMemory,
+  saveFinalGameStateToMemory,
+  deleteGameStateFromMemory
+} = require('../../services/gameStateMemoryService');
 
-const completeValidation = (game, io) => {
+const completeValidation = async (game, io) => {
   console.log("📤 Validation complete for game:", game.id);
   const roundResult = game.roundResults[game.roundResults.length - 1];
   game.nameValidations.forEach(validation => {
@@ -30,11 +35,20 @@ const completeValidation = (game, io) => {
   game.phase = "results";
   game.currentRound += 1;
   // If this was the last round.
-      const maxRounds = game.maxRound // or whatever your game's max rounds is
-      if (game.currentRound >= maxRounds) {
-        //calculateUniqueWords(game);
-        game.phase = "finished";
-      }
+  const maxRounds = game.maxRound || game.players.length * 2 || 26;// or whatever your game's max rounds is
+  if (game.currentRound >= maxRounds) {
+    //calculateUniqueWords(game);
+    game.phase = "finished";
+    // Save final state to Memory and clean up
+    try {
+      const finalState = await getGameStateFromMemory(game.id);
+      await saveFinalGameStateToMemory(game.id, finalState || game);
+      await deleteGameStateFromMemory(game.id);
+      console.log("✅ Final game state saved to Memory and deleted from Memory store");
+    } catch (err) {
+      console.error("❌ Failed to save final game state:", err);
+    }
+  }
 
   const nextTurnId = game.players[game.currentRound % game.players.length].id;
   game.nextTurn = game.players.find(player => player.id === nextTurnId);

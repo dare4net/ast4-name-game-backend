@@ -2,6 +2,7 @@ const { games } = require('../store/game.store');
 const submissionQueue = require('../../utils/submission-queue');
 const { isWordDuplicate } = require('../../utils/gameLogic');
 const calculateUniqueWords = require('./calculateUniqueWords');
+const { saveGameStateToMemory } = require('../../services/gameStateMemoryService');
 
 const handleTimerEnd = (socket, io) => {
   return async ({ gameId }) => {
@@ -16,12 +17,6 @@ const handleTimerEnd = (socket, io) => {
       return;
     }
     game.phase = "validation";
-
-    /*const hostPlayer = game.players.find(player => player.isHost);
-    if (!hostPlayer || hostPlayer.id !== socket.id) {
-      console.error("❌ Unauthorized timerEnd event. Only the host can trigger this action:", socket.id);
-      return;
-    }*/
 
     try {
       // Get all validated submissions
@@ -126,6 +121,15 @@ const handleTimerEnd = (socket, io) => {
         calculateUniqueWords(game);
         game.phase = "finished";
       }*/
+
+      // Save updated state to Memory
+      try {
+        //await saveGameStateToMemory(gameId, game);
+        saveGameStateToMemory(gameId, game);
+        console.log("✅ Game state updated in Memory (handleTimerEnd)");
+      } catch (err) {
+        console.error("❌ Failed to update game state in Memory (handleTimerEnd):", err);
+      }
 
       console.log("✅ Round processed successfully for all players:", roundResults.letter);
       io.to(gameId).emit("gameStateUpdate", game);
