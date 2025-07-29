@@ -5,76 +5,12 @@ class DictionaryService {
   static API_BASE = "https://en.wiktionary.org/w/api.php";
   static WORDS_LIBRARY_API = "https://words-library.vercel.app/api";
   static CATEGORY_KEYWORDS = {
-    animals: [
-      // General animal terms
-      'animal', 'species', 'creature', 'wildlife', 'fauna', 'zoo', 'pet',
-      // Animal classes
-      'mammal', 'bird', 'reptile', 'amphibian', 'fish', 'insect', 'arthropod', 'crustacean', 'mollusk',
-      // Animal groups
-      'carnivore', 'herbivore', 'omnivore', 'predator', 'prey',
-      // Habitat descriptors
-      'aquatic', 'terrestrial', 'marine', 'domestic', 'wild',
-      // Scientific terms
-      'genus', 'phylum', 'class', 'order', 'family'
-    ],
-    places: [
-      // Administrative divisions
-      'city', 'town', 'country', 'village', 'region', 'state', 'province', 'territory', 'district', 'municipality', 'capital', 'county', 'prefecture',
-      // Geographic features
-      'mountain', 'river', 'lake', 'ocean', 'sea', 'desert', 'forest', 'island', 'peninsula', 'coast', 'bay', 'gulf',
-      // Urban features
-      'metropolis', 'suburb', 'neighborhood', 'borough', 'ward', 'downtown', 'plaza', 'park',
-      // General terms
-      'location', 'place', 'area', 'zone', 'locality', 'settlement', 'destination', 'landmark', 'site'
-    ],
-    things: [
-      // Manufactured items
-      'object', 'item', 'tool', 'device', 'instrument', 'equipment', 'machine', 'appliance', 'gadget', 'apparatus',
-      // Materials
-      'material', 'substance', 'metal', 'plastic', 'wood', 'fabric', 'glass', 'ceramic',
-      // Descriptive terms
-      'artifact', 'product', 'goods', 'commodity', 'implement', 'utensil', 'accessory',
-      // Furniture and fixtures
-      'furniture', 'fixture', 'container', 'vessel', 'receptacle',
-      // Technical terms
-      'mechanism', 'component', 'hardware', 'assembly', 'contraption'
-    ],
-    food: [
-      // General food terms
-      'food', 'dish', 'cuisine', 'meal', 'snack', 'delicacy', 'specialty', 'ingredient', 'edible',
-      // Food categories
-      'fruit', 'vegetable', 'meat', 'grain', 'dairy', 'seafood', 'poultry', 'legume', 'nut', 'spice', 'herb',
-      // Preparation methods
-      'baked', 'roasted', 'fried', 'grilled', 'stewed', 'braised', 'sautéed',
-      // Beverages
-      'beverage', 'drink', 'juice', 'cocktail', 'brew', 'infusion',
-      // Meal types
-      'appetizer', 'entree', 'dessert', 'side dish', 'condiment', 'sauce'
-    ],
-    colors: [
-      // Basic terms
-      'color', 'colour', 'shade', 'hue', 'tint', 'tone', 'pigment', 'dye',
-      // Color properties
-      'primary color', 'secondary color', 'tertiary color', 'complementary color',
-      // Descriptive terms
-      'bright', 'dark', 'light', 'pale', 'deep', 'vivid', 'muted', 'iridescent', 'metallic',
-      // Color science
-      'spectrum', 'chromatic', 'achromatic', 'monochrome', 'polychrome',
-      // Art terms
-      'palette', 'colorway', 'gradient', 'value', 'saturation', 'intensity'
-    ],
-    movies: [
-      // Film industry terms
-      'film', 'movie', 'cinema', 'picture', 'motion picture', 'feature', 'production', 'screening',
-      // Genre terms
-      'drama', 'comedy', 'thriller', 'horror', 'documentary', 'animation', 'western', 'musical',
-      // Production elements
-      'theatrical', 'cinematographic', 'screenplay', 'script', 'scene', 'sequence', 'shot',
-      // Industry roles
-      'director', 'producer', 'actor', 'actress', 'filmmaker', 'cinematographer',
-      // Distribution terms
-      'release', 'premiere', 'blockbuster', 'festival', 'box office'
-    ]
+    animals: ['animal', 'species', 'mammal', 'bird', 'reptile', 'amphibian', 'fish', 'insect', 'creature', 'wildlife', 'fauna', 'zoo'],
+    places: ['city', 'town', 'country', 'village', 'region', 'state', 'province', 'area', 'location', 'place', 'territory', 'district', 'municipality', 'capital'],
+    things: ['object', 'item', 'tool', 'device', 'instrument', 'equipment', 'material', 'substance', 'artifact', 'product'],
+    food: ['food', 'dish', 'cuisine', 'meal', 'ingredient', 'edible', 'fruit', 'vegetable', 'meat', 'beverage', 'drink'],
+    colors: ['color', 'colour', 'shade', 'hue', 'tint', 'pigment'],
+    movies: ['film', 'movie', 'cinema', 'picture', 'production', 'theatrical', 'drama', 'show']
   };
 
   static isEnglishWord(wikitext) {
@@ -90,8 +26,8 @@ class DictionaryService {
     try {
       const value = await redis.get(`dict:${cacheKey}`);
       if (value !== null && value !== undefined) {
-        console.log(`[DictionaryService][Redis] Cache hit for ${cacheKey}`);
-        return { isValid: value === 'true', extract: '' };
+        console.log(`[DictionaryService][Redis] Cache hit for ${cacheKey} and the value is:`, value);
+        return { isValid: value, extract: '' };
       }
       return null;
     } catch (err) {
@@ -102,7 +38,7 @@ class DictionaryService {
 
   static async setCache(cacheKey, isValid) {
     try {
-      await redis.set(`dict:${cacheKey}`, isValid ? 'true' : 'false', { ex: 60 * 60 * 24 }); // 24h expiry
+      await redis.set(`dict:${cacheKey}`, isValid ? 'true' : 'false', { ex: 60 * 60 * 24 * 360}); // 1yr expiry
       console.log(`[DictionaryService][Redis] Cache set for ${cacheKey}:`, isValid);
     } catch (err) {
       console.error(`[DictionaryService][Redis] Error setting cache for ${cacheKey}:`, err);
@@ -110,7 +46,7 @@ class DictionaryService {
   }
 
   static async validateWord(word, category) {
-    if (!word || word.trim().length === 0) return { isValid: false, extract: '' };
+    if (!word || word.trim().length === 0) return { isValid: false, extract: '', rare: false };
 
     const normalizedWord = word.toLowerCase().trim();
     const cacheKey = `${normalizedWord}-${category}`;
@@ -119,35 +55,44 @@ class DictionaryService {
     const cached = await this.getCache(cacheKey);
     if (cached) {
 
-    return { isValid: true, extract: '' };;
+    return { isValid: cached.isValid, extract: '', rare: false };
     }
 
-    // 1. Try the new Words Library API first
-    try {
-      const wlUrl = `${this.WORDS_LIBRARY_API}/${category}/${normalizedWord}`;
-      console.log('[DictionaryService] Fetching Words Library API:', wlUrl);
-      const wlRes = await fetch(wlUrl);
-      console.log('[DictionaryService] Words Library API status:', wlRes.status);
-      if (wlRes.ok) {
-        const wlData = await wlRes.json();
-        console.log('[DictionaryService] Words Library API response', { word: normalizedWord, category, wlData });
-        if (typeof wlData.exists === 'boolean') {
-          await this.setCache(cacheKey, wlData.exists);
-          if (wlData.exists) {
-            return { isValid: true, extract: '' };
+    // Only use Words Library API for places category
+    if (category === 'places' || category === 'animals') {
+      console.log(`[DictionaryService] Checking Words Library API for ${category}:`, normalizedWord);
+      try {
+        const wlUrl = `${this.WORDS_LIBRARY_API}/${category}/${normalizedWord}`;
+        console.log('[DictionaryService] Fetching Words Library API:', wlUrl);
+        const wlRes = await fetch(wlUrl);
+        console.log('[DictionaryService] Words Library API status:', wlRes.status);
+        
+        if (wlRes.ok) {
+          const wlData = await wlRes.json();
+          console.log(`[DictionaryService] Words Library API response for ${category}:`, { word: normalizedWord, exists: wlData.exists });
+          
+          if (typeof wlData.exists === 'boolean') {
+            await this.setCache(cacheKey, wlData.exists);
+            if (wlData.exists) {
+              console.log(`[DictionaryService] Valid ${category} found in Words Library:`, normalizedWord);
+              return { isValid: true, extract: '', rare: true };
+            } else {
+              console.log(`[DictionaryService] ${category} not found in Words Library, trying Wiktionary:`, normalizedWord);
+              if(category === 'animals' ){
+                return { isValid: false, extract: '', rare: false };
+              }
+            }
+            console.log(`[DictionaryService] ${category} not found in Words Library, trying Wiktionary:`, normalizedWord);
+            // Don't set cache here, let Wiktionary validation handle it
           } else {
-            console.log('[DictionaryService] Word not found in Words Library API, falling back to Wiktionary', { word: normalizedWord, category });
-            // fall through to Wiktionary
+            console.log('[DictionaryService] Unexpected Words Library response format for place:', wlData);
           }
-        } else {
-          console.log('[DictionaryService] Words Library API did not return expected format', wlData);
         }
-      } else {
-        console.log('[DictionaryService] Words Library API request failed', wlRes.status, wlRes.statusText);
+      } catch (error) {
+        console.log(`[DictionaryService] Words Library API error for ${category}:`, { word: normalizedWord, error: error.message });
       }
-    } catch (error) {
-      console.log('[DictionaryService] Words Library API error', { word: normalizedWord, error: error.message });
-      // fall through to Wiktionary
+    } else {
+      console.log(`[DictionaryService] Skipping Words Library for non-place and non-animal category: ${category}, word: ${normalizedWord}`);
     }
 
     // 2. Fallback to Wiktionary API (existing logic)
@@ -205,16 +150,34 @@ class DictionaryService {
             else if (category === 'animals') {
               const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
               const isNoun = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
+              console.log(`[DictionaryService] Animal validation details:`, {
+                word: normalizedWord,
+                hasKeyword,
+                isNoun,
+                matchedKeywords: this.CATEGORY_KEYWORDS[category].filter(keyword => wikitext.includes(keyword))
+              });
               isValid = hasKeyword && isNoun;
             }
             // For 'places' category - only check category keywords
             else if (category === 'places') {
-              isValid = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
+              const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
+              console.log(`[DictionaryService] Place validation details:`, {
+                word: normalizedWord,
+                hasKeyword,
+                matchedKeywords: this.CATEGORY_KEYWORDS[category].filter(keyword => wikitext.includes(keyword))
+              });
+              isValid = hasKeyword;
             }
             // For other categories, keep existing behavior
             else if (this.CATEGORY_KEYWORDS[category]) {
               const hasKeyword = this.CATEGORY_KEYWORDS[category].some(keyword => wikitext.includes(keyword));
               const isNoun = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
+              console.log(`[DictionaryService] ${category} validation details:`, {
+                word: normalizedWord,
+                hasKeyword,
+                isNoun,
+                matchedKeywords: this.CATEGORY_KEYWORDS[category].filter(keyword => wikitext.includes(keyword))
+              });
               isValid = hasKeyword && isNoun;
             }
             // If no category keywords found but the word exists and has a noun section, be lenient
@@ -222,23 +185,25 @@ class DictionaryService {
               //result.isValid = wikitext.includes('==noun==') || wikitext.includes('==proper noun==');
               isValid = false; // Default to false if no category keywords are defined
             }
+            
+
           }
         } catch (jsonError) {
           console.error(`JSON parse error for "${normalizedWord}":`, jsonError);
         }
+        await this.setCache(cacheKey, isValid);
       } else {
         // API error - be lenient and check if word looks reasonable
         console.warn(`API error for "${normalizedWord}":`, response.status);
         isValid = this.isReasonableWord(normalizedWord);
       }
-      await this.setCache(cacheKey, isValid);
       console.log(`Validation result for "${normalizedWord}" in category "${category}":`, isValid);
-      return { isValid, extract };
+      return { isValid, extract: '', rare: true };
     } catch (error) {
       console.error(`Network error validating "${normalizedWord}":`, error);
       const isValid = this.isReasonableWord(normalizedWord);
       // Do not cache network errors
-      return { isValid, extract: '' };
+      return { isValid, extract: '', rare: false };
     }
   }
 

@@ -22,12 +22,15 @@ const selectLetter = (socket, io) => {
       game.phase = "playing";
       game.roundStartTime = Date.now(); // Add round start timestamp
       
+            // Clear per-round submission data for the new round
+      //submissionQueue.clearRound(gameId);
+
       // Set the current letter in the submission queue
       submissionQueue.setCurrentLetter(gameId, letter);
 
       // Save updated state to Redis
       //await saveGameStateToRedis(gameId, game);
-       saveGameStateToRedis(gameId, game);
+       //saveGameStateToRedis(gameId, game);
       console.log("✅ Game state updated in Redis (selectLetter)");
 
       console.log("✅ Letter selected successfully:", game.id);

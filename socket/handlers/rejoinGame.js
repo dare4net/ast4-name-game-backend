@@ -1,5 +1,6 @@
 const { games } = require('../store/game.store');
 const { trackPlayerSession } = require('../store/player.store');
+const { restoreGameState } = require('../../services/gameStateService');
 
 /**
  * Handler for rejoining a game after socket reconnect.
@@ -9,10 +10,20 @@ const { trackPlayerSession } = require('../store/player.store');
 function rejoinGame(socket, io) {
   return async ({ gameId, playerId }, callback) => {
     try {
-      const game = games[gameId];
+      let game = games[gameId];
+      
+      // If game not in memory, try to restore it
       if (!game) {
-        if (callback) callback({ success: false, message: 'Game not found' });
-        return;
+        const restoredState = await restoreGameState(gameId);
+        if (restoredState) {
+          // Restore the game to memory
+          games[gameId] = restoredState;
+          game = restoredState;
+          console.log(`🔄 Restored game ${gameId} from persistent storage`);
+        } else {
+          if (callback) callback({ success: false, message: 'Game not found in storage' });
+          return;
+        }
       }
       // Find the player by persistent playerId
       const player = game.players.find(p => p.id === playerId);

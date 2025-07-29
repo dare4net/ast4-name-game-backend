@@ -32,34 +32,41 @@ class DictionaryService {
       category
     });
 
-    // 1. Try the new Words Library API first
-    try {
-      const wlUrl = `${this.WORDS_LIBRARY_API}/${category}/${normalizedWord}`;
-      console.log('[DictionaryService] Fetching Words Library API:', wlUrl);
-      const wlRes = await fetch(wlUrl);
-      console.log('[DictionaryService] Words Library API status:', wlRes.status);
-      if (wlRes.ok) {
-        const wlData = await wlRes.json();
-        console.log('[DictionaryService] Words Library API response', { word: normalizedWord, category, wlData });
-        if (typeof wlData.exists === 'boolean') {
-          if (wlData.exists) {
-            const result = { isValid: true, extract: '' };
-            this.cache.set(cacheKey, result);
-            console.log('[DictionaryService] Word validation complete (Words Library API)', { word: normalizedWord, category, isValid: true });
-            return result;
+    // 1. Try the Words Library API only for places category
+    if (category === 'places') {
+      console.log('[DictionaryService] Using Words Library API for places category');
+      try {
+        const wlUrl = `${this.WORDS_LIBRARY_API}/${category}/${normalizedWord}`;
+        console.log('[DictionaryService] Fetching Words Library API:', wlUrl);
+        const wlRes = await fetch(wlUrl);
+        console.log('[DictionaryService] Words Library API status:', wlRes.status);
+        
+        if (wlRes.ok) {
+          const wlData = await wlRes.json();
+          console.log('[DictionaryService] Words Library API response', { word: normalizedWord, category, wlData });
+          
+          if (typeof wlData.exists === 'boolean') {
+            if (wlData.exists) {
+              const result = { isValid: true, extract: '' };
+              this.cache.set(cacheKey, result);
+              console.log('[DictionaryService] Place validation successful (Words Library API)', { word: normalizedWord, isValid: true });
+              return result;
+            } else {
+              console.log('[DictionaryService] Place not found in Words Library API, falling back to Wiktionary');
+              // fall through to Wiktionary
+            }
           } else {
-            console.log('[DictionaryService] Word not found in Words Library API, falling back to Wiktionary', { word: normalizedWord, category });
-            // fall through to Wiktionary
+            console.log('[DictionaryService] Words Library API did not return expected format', wlData);
           }
         } else {
-          console.log('[DictionaryService] Words Library API did not return expected format', wlData);
+          console.log('[DictionaryService] Words Library API request failed', wlRes.status, wlRes.statusText);
         }
-      } else {
-        console.log('[DictionaryService] Words Library API request failed', wlRes.status, wlRes.statusText);
+      } catch (error) {
+        console.log('[DictionaryService] Words Library API error', { word: normalizedWord, error: error.message });
+        // fall through to Wiktionary
       }
-    } catch (error) {
-      console.log('[DictionaryService] Words Library API error', { word: normalizedWord, error: error.message });
-      // fall through to Wiktionary
+    } else {
+      console.log(`[DictionaryService] Skipping Words Library API for category: ${category}, using Wiktionary directly`);
     }
 
     // 2. Fallback to Wiktionary API (existing logic)

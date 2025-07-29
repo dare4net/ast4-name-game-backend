@@ -5,6 +5,7 @@ const handleTimerEnd = require('./handleTimerEnd'); // You must implement this i
 
 // Helper function to update player stats
 const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, submissionTime) => {
+  console.log("[updatePlayerStats]: Updating player stats for:", playerId);
   const player = game.players.find(p => p.id === playerId);
   if (!player) return;
 
@@ -18,7 +19,10 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
       longestWord: { word: '', length: 0 },
       perfectRounds: 0,
       submissionTimes: [],
-      allSubmittedWords: new Set()
+      allSubmittedWords: new Set(),
+      letterMastered: [],
+      categoriesMastered: [...game.selectedCategories].map( cat => cat.id ),
+      kingBonus: 0 // Track king bonus separately
     };
   }
 
@@ -34,6 +38,7 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
   
   // Track all words submitted by the player
   for (const [category, submission] of Object.entries(validatedSubmissions)) {
+    if (!submission) continue; // Guard against undefined
     if (category === 'names') continue;
     const { word, validation, isStartValid } = submission;
     if (isStartValid && validation.isValid) {
@@ -45,6 +50,7 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
   let longestThisRound = { word: '', length: 0 };
 
   for (const [category, submission] of Object.entries(validatedSubmissions)) {
+    if (!submission) continue; // Guard against undefined
     if (category === 'names') continue;
 
     const { word, validation, isStartValid } = submission;
