@@ -33,7 +33,7 @@ const completeValidation = (game, io) => {
   game.phase = "results";
   game.currentRound += 1;
   // If this was the last round.
-      const maxRounds = game.maxRound || game.players.length * 2 || 26;// or whatever your game's max rounds is
+      const maxRounds = game.maxRound || game.players.length * 4 || 26;// or whatever your game's max rounds is
       if (game.currentRound >= maxRounds) {
         //calculateUniqueWords(game);
         game.phase = "finished";
@@ -183,16 +183,40 @@ const completeValidation = (game, io) => {
     console.log(`   📈 Updated stats for ${player.name}:`, JSON.stringify(player.stats, null, 2));
   });
 
-  // Re-emit game state with updated stats
+  // Generate AI commentary for each player
+  const AICommentaryService = require('../../services/AICommentaryService');
+  const currentRoundIdx = game.roundResults.length - 1;
+  const comments = AICommentaryService.generateCommentary(game, currentRoundIdx);
+  
+  // Add comments to round results
+  roundResult.aiCommentary = Object.fromEntries(comments);
+  
+  console.log("\n🎭 AI Commentary for this round:");
+  comments.forEach((comment, playerId) => {
+    const player = game.players.find(p => p.id === playerId);
+    console.log(`\n${player.name}:`);
+    console.log(comment);
+  });
+
+  // Re-emit game state with updated stats and commentary
   console.log("✅ Player stats updated");
   io.to(game.id).emit("gameStateUpdate", game);
-        try {
-        saveGameStateToMemory(game.id, game);
-        saveGameStateToRedis(game.id, game);
-        console.log("✅ Game state updated in Memory and redis (handleTimerEnd)");
-      } catch (err) {
-        console.error("❌ Failed to update game state in Memory or redis (handleTimerEnd):", err);
-      }
+  
+  // Emit personalized comments to each player
+  comments.forEach((comment, playerId) => {
+    const playerSocket = game.players.find(p => p.id === playerId)?.socketId;
+    if (playerSocket) {
+      io.to(playerSocket).emit("aiCommentary", { comment });
+    }
+  });
+
+  try {
+    saveGameStateToMemory(game.id, game);
+    saveGameStateToRedis(game.id, game);
+    console.log("✅ Game state updated in Memory and redis (handleTimerEnd)");
+  } catch (err) {
+    console.error("❌ Failed to update game state in Memory or redis (handleTimerEnd):", err);
+  }
 };
 
 module.exports = completeValidation;

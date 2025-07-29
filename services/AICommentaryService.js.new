@@ -1,0 +1,560 @@
+// Player profiles to maintain stats throughout the game
+const playerProfiles = new Map();
+
+const BONUS_COMMENTS = {
+  FASTEST: [
+    "with that sonic speed ⚡",
+    "flash who? we only know {playerName} ⚡",
+    "speedrunning the round fr ⚡",
+    "typing at the speed of light ⚡",
+    "fastest fingers in the west fr ⚡",
+    "speed demon behavior spotted 🏃‍♂️",
+    "running circles around everyone else 🔄",
+    "giving acceleration realness 🚀"
+  ],
+  LONGEST_WORD: [
+    "flexing with '{word}' 📚",
+    "dictionary.com stan behavior with '{word}' 📚",
+    "serving vocabulary with '{word}' 📚",
+    "oxford dictionary tease with '{word}' 📚",
+    "spelling bee champion energy with '{word}' 🐝",
+    "vocabulary on fleek with '{word}' 💅",
+    "living that lexicon life with '{word}' 📖",
+    "spelling game too strong with '{word}' 💪"
+  ],
+  RARE_WORDS: [
+    "rare word collector fr 🎯",
+    "dropping them vocabulary bombs 💣",
+    "encyclopedia mode activated 🧠",
+    "showing off that big brain energy 🎓",
+    "vocabulary flex on point 💪",
+    "thesaurus.com bestie fr 📚",
+    "giving word genius energy 🤓",
+    "rare word game too strong 💯"
+  ],
+  MASTER: [
+    "letter master era unlocked 👑",
+    "letter {letter} belongs to you now 👑",
+    "owning this round periodt 💅",
+    "perfect round behavior 🎯",
+    "letter {letter} bow down to your new ruler 👑",
+    "mastery level: iconic 💫",
+    "letter {letter} found its main character 🌟",
+    "perfection? we love to see it 💅"
+  ]
+};
+
+const SITUATIONS = {
+  WINNING: {
+    DOMINANT: {
+      COMMENTS: [
+        "bestie really woke up and chose violence 💅",
+        "icon behavior only fr fr 👑",
+        "not them getting cooked in 4K 📸",
+        "your mind >>> everyone else's combined frfr 🧠",
+        "the others giving background character energy rn 🎬",
+        "making them look like NPCs no shade 🎮",
+        "absolute slayage, they could never 💅",
+        "everyone else is just here for decoration ig 🎭",
+        "they're all in your cinematic universe bestie 🎥",
+        "mother is mothering periodt 👑",
+        "writing a masterclass in real time fr 📚",
+        "what's a king to a god type beat 👑",
+        "POV: you're watching a pro gamer moment 🎯",
+        "serving winner winner chicken dinner 🍗",
+        "living in their heads rent free rn 🏠"
+      ],
+      ADVICE: [
+        "call a letter that {lowestPlayer} struggles with bestie 😈",
+        "your power is unmatched, drop some tips maybe? 👑",
+        "try spelling supercalifragilisticexpialidocious next 📚",
+        "might as well try blindfolded at this point 🙈",
+        "speedrun strat: submit before they even start typing ⚡",
+        "drop some rare words just to flex on em 💪",
+        "teach a masterclass while you're at it 📚",
+        "maybe give them a 30 second headstart? 😈",
+        "try playing with your eyes closed for a challenge 👀",
+        "share your cheat codes bestie (jk jk) 🎮",
+        "time to go for the world record fr 🏆",
+        "show them what peak performance looks like 📈",
+        "might as well do a victory lap rn 🏃‍♂️",
+        "go for that perfect game achievement 🎯",
+        "drop the tutorial link in the chat frfr 📱"
+      ],
+      INSIGHTS: [
+        "literally in a league of your own rn 🏆",
+        "they're all just playing for second place fr 🥈",
+        "watching history being made rn 📜",
+        "this is what we call a skill issue for them 💅",
+        "main character energy radiating off you 🌟",
+        "giving protagonist in their prime rn ✨",
+        "everyone else looking like side characters fr 🎭",
+        "this is your world, they just living in it 🌍",
+        "the gap is astronomical at this point 🚀",
+        "definition of built different frfr 💪",
+        "they're gonna study your gameplay later 📚",
+        "putting on a masterclass rn no cap 🎓",
+        "the throne looking comfy bestie 👑",
+        "giving GOAT behavior fr 🐐",
+        "writing yourself into the history books rn 📖"
+      ]
+    },
+    CONSISTENT: {
+      COMMENTS: [
+        "the grip you have on this game? iconic. 💫",
+        "steady winning? we love that journey for you 📈",
+        "maintaining that lead like it's nothing 💅",
+        "consistent queen/king behavior fr 👑",
+        "your mind stays winning bestie 🧠",
+        "they can't touch your highness rn 👑",
+        "keeping that crown secure i see you 👀",
+        "the throne looks comfy on you fr 💅",
+        "holding that lead like a pro gamer 🎮",
+        "unbothered, staying winning 💫"
+      ],
+      ADVICE: [
+        "maintain that lead bestie, flex a little 💅",
+        "try some spicy words next round? 🌶️",
+        "perfect round = asserting dominance frfr 👑",
+        "speedrun strat could secure the dub 🏃‍♂️",
+        "go for that rare word bonus flex 📚",
+        "show them consistency is key 🔑",
+        "time to unlock your final form maybe? 🔓",
+        "drop the strategy guide bestie 📖",
+        "share some tips (or don't, slay) 💅",
+        "perfect time for some power moves 💪"
+      ],
+      INSIGHTS: [
+        "the consistency is giving winner 📈",
+        "you're what they call a professional 💼",
+        "making excellence look effortless 💅",
+        "this is your empire fr fr 👑",
+        "watching a master at work rn 🎨",
+        "the blueprint: it's you bestie 📝",
+        "giving masterclass energy 24/7 📚",
+        "your reputation? solidified. 💫",
+        "the standard has been set periodt 📊",
+        "watching art in motion fr 🎭"
+      ]
+    }
+  },
+  LOSING: {
+    PLUMMETING: {
+      COMMENTS: [
+        "bestie wyd? you good? 💀",
+        "giving flop era energy rn ngl 📉",
+        "prayers up, you'll bounce back (maybe) 🙏",
+        "the struggle bus got a new passenger fr 🚌",
+        "your gaming chair must be broken 💺",
+        "did you forget how to play bestie? 😭",
+        "getting cooked in 4K HDR rn 📸",
+        "this is definitely your villain origin story 🦹",
+        "you really said 'let me make history' 📉",
+        "giving very much underwater gameplay 🌊"
+      ],
+      ADVICE: [
+        "bestie there's still time to alt+f4 ⌨️",
+        "maybe try turning your screen on? 🖥️",
+        "remember: typing words helps 📝",
+        "submission idea: try actual words maybe? 📚",
+        "autocorrect is free bestie js 💭",
+        "study {strongPlayer}'s gameplay (desperately) 📚",
+        "time to break the emergency glass fr 🚨",
+        "dictionary.com is your friend rn 📖",
+        "powerup = your last hope bestie 🆘",
+        "might need to phone a friend fr 📱"
+      ],
+      INSIGHTS: [
+        "rock bottom looking like a goal rn 📉",
+        "giving very much practice round energy 🎯",
+        "character development loading... still ⌛",
+        "this is definitely going in your cringe compilation 😬",
+        "your reputation era fr fr 📉",
+        "watching a masterclass in what not to do 📚",
+        "villain arc loading... 90% complete 🦹",
+        "the highlight reel gonna be interesting 🎬",
+        "giving early elimination vibes 🚫",
+        "speed running to last place fr 🏃‍♂️"
+      ]
+    },
+    STRUGGLING: {
+      COMMENTS: [
+        "bestie... you're trying and that's what counts 🥺",
+        "giving participation award energy rn 🏆",
+        "the effort is... present 👀",
+        "not you fighting for your life fr 😮‍💨",
+        "struggling but make it aesthetic 🎭",
+        "at least you look good losing 💅",
+        "the spirit is willing but the skill is weak 😩",
+        "giving very much first day energy still 🆕",
+        "character building moment frfr 🏗️",
+        "the attempt was made bestie 🌟"
+      ],
+      ADVICE: [
+        "try words that exist maybe? 📚",
+        "bestie the dictionary is free 📖",
+        "submit faster = more time to regret ⚡",
+        "manifest some skill quick 🙏",
+        "copy {strongPlayer}'s homework fr 📝",
+        "time to use that powerup emergency style 🆘",
+        "maybe try button mashing? 🎮",
+        "switch up the strategy (any strategy) 🔄",
+        "autocorrect might help bestie 💭",
+        "letter '{goodLetter}' could save you rn 📝"
+      ],
+      INSIGHTS: [
+        "the potential is there (with binoculars) 🔭",
+        "character development incoming... hopefully 📈",
+        "giving underdog story potential 🐕",
+        "the comeback setup is real 🎬",
+        "rock bottom has a nice view ig 👀",
+        "nowhere to go but up bestie 📈",
+        "this is just the origin story fr 📖",
+        "villain arc potential strong rn 😈",
+        "the learning curve looking steep 📊",
+        "keeping it humble by force 🙏"
+      ]
+    }
+  },
+  COMEBACK: {
+    STRONG: {
+      COMMENTS: [
+        "THE REDEMPTION ARC WE NEEDED 😭",
+        "okay main character moment? 📈",
+        "giving protagonist power-up episode 💪",
+        "hello??? pop off then bestie 🌟",
+        "the glow up is REAL real 💅",
+        "you really said 'watch this' fr 👀",
+        "character development hitting different 📈",
+        "the power of friendship activated fr 💫",
+        "anime training arc complete 🎯",
+        "giving superhero origin story rn ⚡"
+      ],
+      ADVICE: [
+        "keep that same energy bestie 🔥",
+        "perfect round incoming? 👀",
+        "time to show them who's boss fr 💪",
+        "channel that main character energy 🌟",
+        "your power level? OVER 9000 ⚡",
+        "go for that perfect round flex 💅",
+        "show them it wasn't luck fr 💫",
+        "time to secure your spot at the top 👑",
+        "maintain this protagonist energy 🦸",
+        "drop that combo on them fr 💪"
+      ],
+      INSIGHTS: [
+        "watching a legend in the making 📈",
+        "the comeback kid strikes again 💫",
+        "giving anime protagonist energy fr ⚡",
+        "main character plot armor activated 🛡️",
+        "they sleep but you don't fr 😴",
+        "the underdog story we needed 🐕",
+        "plot twist of the season fr 📺",
+        "redemption arc hits different 📈",
+        "villain turned hero type beat 🦸",
+        "this is what we call character development 📖"
+      ]
+    },
+    POTENTIAL: {
+      COMMENTS: [
+        "bestie... is that a glow up I see? 👀",
+        "the improvement? we love to see it 📈",
+        "giving dark horse energy rn 🐎",
+        "character development loading... 🔄",
+        "okay wait you might be onto something 💭",
+        "the potential is showing bestie 💫",
+        "from zero to hero pipeline fr 📈",
+        "leveling up in real time? 🆙",
+        "wait cause who is this new person 👀",
+        "the skills are unlocking bestie 🔓"
+      ],
+      ADVICE: [
+        "keep this energy bestie, you're onto something 💫",
+        "perfect time for that power-up 🆙",
+        "channel that underdog spirit fr 🐕",
+        "time to show them what you've learned 📚",
+        "surprise them with a perfect round 🎯",
+        "manifest that main character energy 🌟",
+        "your villain arc is over, time to shine ✨",
+        "lock in that improvement fr 🔒",
+        "show them this ain't a fluke 💪",
+        "perfect time for some rare words 📚"
+      ],
+      INSIGHTS: [
+        "the blueprint is forming bestie 📝",
+        "dark horse energy intensifying 🐎",
+        "potential? UNLOCKING 🔓",
+        "giving protagonist training arc 💪",
+        "the evolution is real fr 📈",
+        "butterfly emerging from cocoon vibes 🦋",
+        "watching you find your power 💫",
+        "this is just the warm up fr 🔥",
+        "leveling up in real time 🎮",
+        "the skills are downloading bestie ⬇️"
+      ]
+    }
+  },
+  NEUTRAL: {
+    CONSISTENT: {
+      COMMENTS: [
+        "giving very much... present 👀",
+        "the most neutral player ever fr 📊",
+        "perfectly balanced vibes 🫂",
+        "not winning not losing just vibing 🌟",
+        "existing in a state of pure neutrality 📊",
+        "the Switzerland of this game fr 🇨🇭",
+        "unbothered, balanced, in your neutral era 🧘",
+        "giving very much middle ground rn ⚖️",
+        "not too hot, not too cold, just right 🌡️",
+        "the most balanced player fr fr ⚖️"
+      ],
+      ADVICE: [
+        "try submitting faster for bonus points ⚡",
+        "focus on getting all categories valid 📝",
+        "perfect round = extra points bestie 🎯",
+        "rare words could boost your score rn 📚",
+        "time to shake things up maybe? 🌪️",
+        "might be time to take some risks bestie 🎲",
+        "playing it safe won't get you to the top 📈",
+        "try something unexpected next round 🎯",
+        "mix up your strategy a bit 🔄",
+        "maybe it's time to go all in? 🎰"
+      ],
+      INSIGHTS: [
+        "you could really pop off with the right strategy 💭",
+        "potential waiting to be unleashed fr 🦋",
+        "middle of the pack but not for long? 👀",
+        "giving dark horse energy ngl 🐎",
+        "the calm before the storm perhaps? ⚡",
+        "feeling a plot twist coming soon 📖",
+        "this balanced era might not last long 📊",
+        "you're about to surprise everyone fr 🎭",
+        "main character energy loading... ⌛",
+        "waiting for your moment to shine ✨"
+      ]
+    }
+  }
+};
+
+class AICommentaryService {
+  static updatePlayerProfile(game, currentRoundIdx) {
+    const round = game.roundResults[currentRoundIdx];
+    const allScores = game.players.map(p => p.score).sort((a, b) => b - a);
+
+    game.players.forEach(player => {
+      if (!playerProfiles.has(player.id)) {
+        playerProfiles.set(player.id, {
+          scoreHistory: [],
+          bonusHistory: [],
+          letterPerformance: {},
+          weakestCategories: new Set(),
+          strongestCategories: new Set(),
+          lastThreeRoundsDelta: 0,
+          perfectRounds: 0,
+          situation: 'NEUTRAL'
+        });
+      }
+
+      const profile = playerProfiles.get(player.id);
+      const roundScore = round.scores[player.id] || 0;
+      
+      // Update score history and calculate delta
+      profile.scoreHistory.push(roundScore);
+      const lastThree = profile.scoreHistory.slice(-3);
+      profile.lastThreeRoundsDelta = lastThree.length > 1 ? 
+        lastThree[lastThree.length - 1] - lastThree[0] : 0;
+
+      // Track bonuses
+      if (round.extraBonuses) {
+        if (round.extraBonuses.fastestSubmission?.playerId === player.id) {
+          profile.bonusHistory.push({ type: 'FASTEST', round: currentRoundIdx });
+        }
+        if (round.extraBonuses.longestWord?.playerId === player.id) {
+          profile.bonusHistory.push({ type: 'LONGEST', round: currentRoundIdx });
+        }
+        if (round.extraBonuses.master?.playerId === player.id) {
+          profile.bonusHistory.push({ type: 'MASTER', round: currentRoundIdx });
+        }
+      }
+
+      // Calculate relative performance metrics
+      const position = allScores.indexOf(player.score);
+      const percentile = (position / allScores.length) * 100;
+      
+      // Calculate score differences
+      const scoreGapToFirst = position === 0 ? 0 : allScores[0] - player.score;
+      const scoreGapToLast = position === allScores.length - 1 ? 0 : player.score - allScores[allScores.length - 1];
+      
+      // Calculate relative deltas (compare player's improvement to others)
+      const allDeltas = game.players.map(p => {
+        const profile = playerProfiles.get(p.id);
+        return profile?.lastThreeRoundsDelta || 0;
+      });
+      const avgDelta = allDeltas.reduce((a, b) => a + b, 0) / allDeltas.length;
+      const relativeDelta = profile.lastThreeRoundsDelta - avgDelta;
+
+      // Calculate performance consistency
+      const recentScores = profile.scoreHistory.slice(-3);
+      const scoreVariance = recentScores.length > 1 ? 
+        Math.sqrt(recentScores.reduce((sum, score) => sum + Math.pow(score - (recentScores.reduce((a, b) => a + b, 0) / recentScores.length), 2), 0) / recentScores.length) : 0;
+
+      // Determine situation and subcategory based on comprehensive analysis
+      if (percentile <= 25) {
+        profile.situation = 'WINNING';
+        // DOMINANT if: maintaining lead AND improving faster than others OR huge lead
+        if ((relativeDelta > 5 && scoreGapToFirst < 10) || scoreGapToFirst > 30) {
+          profile.subCategory = 'DOMINANT';
+        } else {
+          profile.subCategory = 'CONSISTENT';
+        }
+      } else if (percentile >= 75) {
+        profile.situation = 'LOSING';
+        // PLUMMETING if: falling behind AND doing worse than others
+        if (relativeDelta < -10 || (profile.lastThreeRoundsDelta < -15 && scoreVariance > 10)) {
+          profile.subCategory = 'PLUMMETING';
+        } else {
+          profile.subCategory = 'STRUGGLING';
+        }
+      } else {
+        // Middle pack analysis
+        if (relativeDelta > 15 || (profile.lastThreeRoundsDelta > 20 && scoreGapToFirst < 20)) {
+          // Strong comeback if improving much faster than others or closing gap to leader
+          profile.situation = 'COMEBACK';
+          profile.subCategory = 'STRONG';
+        } else if (relativeDelta > 5 || profile.lastThreeRoundsDelta > 10) {
+          // Potential comeback if showing improvement
+          profile.situation = 'COMEBACK';
+          profile.subCategory = 'POTENTIAL';
+        } else if (scoreVariance < 5 && Math.abs(relativeDelta) < 5) {
+          // Truly consistent if scores are stable and keeping pace with others
+          profile.situation = 'NEUTRAL';
+          profile.subCategory = 'CONSISTENT';
+        } else {
+          // Default to struggling if not meeting other criteria
+          profile.situation = 'LOSING';
+          profile.subCategory = 'STRUGGLING';
+        }
+      }
+      
+      // Track consistency
+      profile.lastSituation = profile.currentSituation;
+      profile.currentSituation = { main: profile.situation, sub: profile.subCategory };
+    });
+  }
+
+  static generateCommentary(game, currentRoundIdx) {
+    this.updatePlayerProfile(game, currentRoundIdx);
+    const comments = new Map();
+    const round = game.roundResults[currentRoundIdx];
+
+    // Find strongest and weakest players for context
+    const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score);
+    const strongestPlayer = sortedPlayers[0];
+    const weakestPlayer = sortedPlayers[sortedPlayers.length - 1];
+
+    // Get unused letters
+    const usedLetters = new Set(game.roundResults.map(r => r.letter));
+    const unusedLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      .split('')
+      .filter(l => !usedLetters.has(l));
+
+    game.players.forEach(player => {
+      const profile = playerProfiles.get(player.id);
+      const situation = profile.situation;
+      let commentary = '';
+
+      // Build a dynamic commentary based on situation and analysis
+      const params = {
+        lowestPlayer: weakestPlayer.name,
+        strongPlayer: strongestPlayer.name,
+        goodLetter: unusedLetters[Math.floor(Math.random() * unusedLetters.length)]
+      };
+
+      // Get base commentary for main situation
+      commentary += this.getRandomComment(situation, profile.subCategory, 'COMMENTS') + '\n\n';
+
+      // Add 1-2 pieces of strategic advice
+      const numAdvice = Math.random() > 0.5 ? 2 : 1;
+      for (let i = 0; i < numAdvice; i++) {
+        commentary += this.getRandomComment(situation, profile.subCategory, 'ADVICE', params) + ' ';
+      }
+      commentary += '\n\n';
+
+      // Add an insight
+      commentary += this.getRandomComment(situation, profile.subCategory, 'INSIGHTS', params) + '\n';
+
+      // Add bonus achievements if any
+      if (round.extraBonuses) {
+        const { fastestSubmission, longestWord, rareWords, master } = round.extraBonuses;
+        
+        if (fastestSubmission?.playerId === player.id) {
+          commentary += this.getRandomBonusComment('FASTEST', { playerName: player.name }) + ' ';
+        }
+        
+        if (longestWord?.playerId === player.id) {
+          commentary += this.getRandomBonusComment('LONGEST_WORD', { word: longestWord.word }) + ' ';
+        }
+        
+        if (rareWords?.some(rw => rw.playerId === player.id)) {
+          commentary += this.getRandomBonusComment('RARE_WORDS') + ' ';
+        }
+        
+        if (master?.playerId === player.id) {
+          commentary += this.getRandomBonusComment('MASTER', { letter: round.letter });
+        }
+      }
+
+      comments.set(player.id, commentary.trim());
+    });
+
+    return comments;
+  }
+
+  static getRandomComment(situation, subCategory, type, params = {}) {
+    // First try to get comments for the specific situation and subcategory
+    let options = SITUATIONS[situation]?.[subCategory]?.[type];
+    
+    // If not found, try the CONSISTENT subcategory of the same situation
+    if (!options && situation !== 'NEUTRAL') {
+      options = SITUATIONS[situation]?.['CONSISTENT']?.[type];
+    }
+    
+    // If still not found, fall back to NEUTRAL.CONSISTENT
+    if (!options) {
+      options = SITUATIONS['NEUTRAL']['CONSISTENT'][type];
+    }
+    
+    if (!options || options.length === 0) {
+      console.warn(`No comments found for ${situation}.${subCategory}.${type}, using default`);
+      return "vibing fr fr 😎";
+    }
+
+    let comment = options[Math.floor(Math.random() * options.length)];
+    
+    // Replace any parameters in the comment
+    Object.entries(params).forEach(([key, value]) => {
+      comment = comment.replace(`{${key}}`, value);
+    });
+    
+    return comment;
+  }
+
+  static getRandomBonusComment(bonusType, params = {}) {
+    const comments = BONUS_COMMENTS[bonusType];
+    let comment = comments[Math.floor(Math.random() * comments.length)];
+    Object.entries(params).forEach(([key, value]) => {
+      comment = comment.replace(`{${key}}`, value);
+    });
+    return comment;
+  }
+
+  static formatBonusComments(bonuses = [], params = {}) {
+    if (bonuses.length === 0) return '';
+    
+    return '\n' + bonuses
+      .map(bonus => this.getRandomBonusComment(bonus, params))
+      .join(' + ');
+  }
+}
+
+module.exports = AICommentaryService;
