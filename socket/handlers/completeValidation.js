@@ -195,6 +195,11 @@ const completeValidation = (game, io) => {
     console.log(`   📈 Updated stats for ${player.name}:`, JSON.stringify(player.stats, null, 2));
   });
 
+
+    // Re-emit game state with updated stats
+    console.log("✅ Player stats updated");
+    io.to(game.id).emit("gameStateUpdate", game);
+
   // Generate AI commentary for each player
   const AICommentaryService = require('../../services/AICommentaryService');
   const currentRoundIdx = game.roundResults.length - 1;
@@ -210,17 +215,17 @@ const completeValidation = (game, io) => {
     console.log(comment);
   });
 
-  // Re-emit game state with updated stats and commentary
+  // Re-emit game state with commentary
   console.log("✅ Player stats updated");
   io.to(game.id).emit("gameStateUpdate", game);
   
   // Emit personalized comments to each player
-  comments.forEach((comment, playerId) => {
+  /*comments.forEach((comment, playerId) => {
     const playerSocket = game.players.find(p => p.id === playerId)?.socketId;
     if (playerSocket) {
       io.to(playerSocket).emit("aiCommentary", { comment });
     }
-  });
+  });*/
 
   try {
     saveGameStateToMemory(game.id, game);
