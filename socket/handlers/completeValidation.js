@@ -5,7 +5,19 @@ const { saveGameStateToMemory } = require('../../services/gameStateMemoryService
 
 const completeValidation = (game, io) => {
   console.log("📤 Validation complete for game:", game.id);
-  const roundResult = game.roundResults[game.roundResults.length - 1];
+  
+  // Check if roundResult is available
+  //i'm coming back here, this mehod isnt sustainable for checks
+  const roundResultIndex = game.roundResults.length - 1;
+  const roundResult = game.roundResults[roundResultIndex];
+  
+  if (!roundResult) {
+    console.log("⏳ Waiting for round results to be available...");
+    // Try again in 1 second
+    setTimeout(() => completeValidation(game, io), 1000);
+    return;
+  }
+  
   const master = game.nextTurn;
   game.nameValidations.forEach(validation => {
     const yesVotes = Object.values(validation.votes).filter(v => v === "yes").length;

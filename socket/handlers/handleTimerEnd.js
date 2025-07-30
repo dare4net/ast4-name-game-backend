@@ -17,7 +17,27 @@ const handleTimerEnd = (socket, io) => {
       console.warn("⚠️ Timer end already processed for this round or game not found.");
       return;
     }
+
+    // Create immediate dummy name validations for faster UI transition
+    game.nameValidations = [];
+    const submissions = game.submissions || {};
+    Object.entries(submissions).forEach(([playerId, playerSubmissions]) => {
+      if (playerSubmissions.names && playerSubmissions.names.trim().length > 0) {
+        game.nameValidations.push({
+          word: playerSubmissions.names,
+          playerId,
+          votes: {},
+          aiOpinion: "pending",
+          finalResult: "",
+          extract: "Validation in progress..."
+        });
+      }
+    });
+
+    // Switch to validation phase immediately
     game.phase = "validation";
+    game.voteLength = (game.players.length - 1) * game.nameValidations.length;
+    io.to(game.id).emit("gameStateUpdate", game);
 
     try {
       // Get all validated submissions (now returns a Map<playerId, {names, ...otherCategories}>)
@@ -50,7 +70,7 @@ const handleTimerEnd = (socket, io) => {
       // Process results and calculate scores
       const allSubmissions = [];
       const scores = {};
-      game.nameValidations = [];
+      // Don't reset nameValidations here as we already have the dummy ones
       const playerCategoryValidations = new Map(); // Track validations per player
 
       // Group words by category for duplicate checking
@@ -102,16 +122,15 @@ const handleTimerEnd = (socket, io) => {
           if (player && word) player.stats.allSubmittedWords.add(word.toLowerCase());
 
           if (category === "names") {
-            // Only add non-empty names for voting
+            // Update existing name validation with AI opinion
             if (word && word.trim().length > 0) {
-              game.nameValidations.push({
-                word,
-                playerId,
-                votes: {},
-                aiOpinion: validation.isValid ? "valid" : "invalid",
-                finalResult: "",
-                extract: validation.extract || (isStartValid ? "" : "Word does not start with the correct letter")
-              });
+              const existingValidation = game.nameValidations.find(v => 
+                v.playerId === playerId && v.word === word
+              );
+              if (existingValidation) {
+                existingValidation.aiOpinion = validation.isValid ? "valid" : "invalid";
+                existingValidation.extract = validation.extract || (isStartValid ? "" : "Word does not start with the correct letter");
+              }
             }
           } else {
             const isDuplicate = isWordDuplicate(word, wordsByCategory[category]);
@@ -253,8 +272,13 @@ const handleTimerEnd = (socket, io) => {
       };
 
       game.roundResults.push(roundResults);
+      
+      // Ensure voteLength is maintained
       game.voteLength = (game.players.length - 1) * game.nameValidations.length;
-      game.phase = "validation";
+      console.log("Current voteLength:", game.voteLength);
+      console.log("Current round:", game.currentRound);
+      console.log("Current nameValidations count:", game.nameValidations.length);
+      
       game.submissions = {};
 
       // Clear the submission queue for this game
@@ -270,7 +294,19 @@ const handleTimerEnd = (socket, io) => {
       }
 
       console.log("✅ Round processed successfully for all players:", roundResults.letter);
-      io.to(gameId).emit("gameStateUpdate", game);
+      // Ensure we maintain validation phase and other critical state
+      const gameStateForUpdate = {
+        ...game,
+        phase: "validation",  // Ensure we stay in validation phase
+        nameValidations: game.nameValidations, // Keep name validations
+        roundResults: game.roundResults,
+        voteLength: game.voteLength
+      };
+
+      console.log("Phase before update:", game.phase);
+      console.log("VoteLength before update:", game.voteLength);
+      console.log("This is the updated nameValidations: ", game.nameValidations);
+      io.to(gameId).emit("gameStateUpdate", gameStateForUpdate);
     } catch (error) {
       console.error("❌ Error processing round results:", error);
     }
