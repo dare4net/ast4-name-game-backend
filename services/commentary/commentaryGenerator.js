@@ -3,9 +3,9 @@ const CommentHistoryManager = require('./historyManager');
 
 class CommentaryGenerator {
   static getRandomComment(gameId, playerId, situation, subCategory, type, params = {}) {
-    // Initialize global comment history for this type
+    // Initialize player-specific comment history for this type
     const historyKey = `${situation}.${subCategory}.${type}`;
-    const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, historyKey);
+    const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, playerId, historyKey);
     
     // Try to get comments for the specific situation and subcategory
     let options = SITUATIONS[situation]?.[subCategory]?.[type];
@@ -29,10 +29,21 @@ class CommentaryGenerator {
   }
 
   static getRandomBonusComment(gameId, bonusType, params = {}) {
-    const usedComments = CommentHistoryManager.initializeBonusHistory(gameId, bonusType);
+    // Get comments for this bonus type
     const comments = BONUS_COMMENTS[bonusType];
+    if (!comments || !Array.isArray(comments)) {
+      console.warn(`No comments found for bonus type ${bonusType}`);
+      return '';
+    }
     
-    return this.selectAndFormatComment(comments, usedComments, params);
+    // For bonus comments, we'll just randomly select without tracking history
+    const comment = comments[Math.floor(Math.random() * comments.length)];
+    
+    // Replace parameters in the comment
+    return Object.entries(params).reduce((text, [key, value]) => {
+      if (value === null || value === undefined) return text;
+      return text.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value));
+    }, comment);
   }
 
   static validateAndProcessParams(params) {
@@ -145,17 +156,17 @@ class CommentaryGenerator {
     }
 
     // Try to find unused valid comments
-    let availableComments = validComments.filter(comment => !usedComments.has(comment));
+    let availableComments = validComments.filter(comment => !usedComments.includes(comment));
     
     // If all valid comments have been used, reset history for valid comments
     if (availableComments.length === 0) {
-      validComments.forEach(comment => usedComments.delete(comment));
+      usedComments.length = 0;  // Clear the array
       availableComments = validComments;
     }
 
     // Select a random valid comment
     let comment = availableComments[Math.floor(Math.random() * availableComments.length)];
-    usedComments.add(comment);
+    usedComments.push(comment);
     
     // Replace parameters in the comment
     return Object.entries(params).reduce((text, [key, value]) => {

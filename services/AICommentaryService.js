@@ -10,23 +10,23 @@ class AICommentaryService {
 
     // Initialize player profiles in game state if needed
     if (!game.playerProfiles) {
-      game.playerProfiles = new Map();
+      game.playerProfiles = {};
     }
 
     game.players.forEach(player => {
       // Initialize profile if needed
-      if (!game.playerProfiles.has(player.id)) {
-        game.playerProfiles.set(player.id, PlayerProfileManager.initializeProfile());
+      if (!game.playerProfiles[player.id]) {
+        game.playerProfiles[player.id] = PlayerProfileManager.initializeProfile();
       }
 
-      const profile = game.playerProfiles.get(player.id);
+      const profile = game.playerProfiles[player.id];
       
       // Update bonus history
       PlayerProfileManager.updateBonusHistory(profile, round, player.id, currentRoundIdx);
 
       // Calculate metrics
       const allDeltas = game.players.map(p => {
-        const profile = game.playerProfiles.get(p.id);
+        const profile = game.playerProfiles[p.id];
         return profile?.lastThreeRoundsDelta || 0;
       });
 
@@ -62,12 +62,12 @@ class AICommentaryService {
     // Calculate scores and deltas for metrics
     const allScores = game.players.map(p => p.score).sort((a, b) => b - a);
     const allDeltas = game.players.map(p => {
-      const profile = game.playerProfiles.get(p.id);
+      const profile = game.playerProfiles[p.id];
       return profile?.lastThreeRoundsDelta || 0;
     });
 
     game.players.forEach(player => {
-      const profile = game.playerProfiles.get(player.id);
+      const profile = game.playerProfiles[player.id];
       const metrics = PlayerProfileManager.calculateMetrics(profile, player, round, allScores, allDeltas, game);
       // Ensure we have valid values for all parameters
       const goodLetter = unusedLetters.length > 0 
