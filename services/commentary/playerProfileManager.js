@@ -181,7 +181,7 @@ class PlayerProfileManager {
       //New Algo
       // WINNING detection
     if (topQuarter || isFirst) {
-      const isDominant = scoreGapToFirst < 20 || (relativeDelta > 5 && isFirst);
+      const isDominant = (scoreGapToFirst < 20 && scoreGapToPrev > 20) || (relativeDelta > 5 && isFirst);
 
       return {
         situation: 'WINNING',
@@ -190,14 +190,15 @@ class PlayerProfileManager {
     }
 
     // LOSING detection
-    if (bottomQuarter || isLast) {
-      const isPlummeting = relativeDelta < -10 || 
-        (metrics.lastThreeRoundsDelta < -15 && scoreVariance > 10);
-      return {
-        situation: 'LOSING',
-        subCategory: isPlummeting ? 'PLUMMETING' : 'STRUGGLING'
-      };
-    }
+      if (bottomQuarter || isLast) {
+    const recentlyDropping = lastThreeRoundsDelta < -10 && relativeDelta < -5;
+    const flatOrWeak = Math.abs(lastThreeRoundsDelta) < 5 || scoreGapToNext > 30;
+
+    return {
+      situation: 'LOSING',
+      subCategory: recentlyDropping ? 'PLUMMETING' : 'STRUGGLING'
+    };
+  }
 
     // Middle pack analysis with momentum
     const momentumFactor = relativeDelta * 1.5;
