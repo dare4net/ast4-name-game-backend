@@ -104,6 +104,12 @@ class PlayerProfileManager {
       inCompetitiveRange, playersNearby, isCloseToNext, closeToPrevious
     } = metrics;
 
+    const topQuarter = position <= Math.floor(totalPlayers / 4);
+    const bottomQuarter = position >= Math.ceil((3 * totalPlayers) / 4);
+    const isFirst = position === 0;
+    const isLast = position === totalPlayers - 1;
+
+
     const isEndgame = currentRoundIdx >= game.maxround - 3;
     const playerThresholds = {
       small: 4,    // 2-4 players
@@ -155,7 +161,8 @@ class PlayerProfileManager {
     }
 
     // Standard situation analysis
-    if (percentile <= 25) {
+    //old algo
+    /*if (percentile <= 25) {
       return {
         situation: 'WINNING',
         subCategory: ((relativeDelta > 5 && scoreGapToFirst < 10) || scoreGapToFirst > 30) ? 
@@ -168,6 +175,27 @@ class PlayerProfileManager {
         situation: 'LOSING',
         subCategory: (relativeDelta < -10 || (metrics.lastThreeRoundsDelta < -15 && scoreVariance > 10)) ?
           'PLUMMETING' : 'STRUGGLING'
+      };
+    }*/
+
+      //New Algo
+      // WINNING detection
+    if (topQuarter || isFirst) {
+      const isDominant = scoreGapToFirst < 20 || (relativeDelta > 5 && isFirst);
+
+      return {
+        situation: 'WINNING',
+        subCategory: isDominant ? 'DOMINANT' : 'CONSISTENT'
+      };
+    }
+
+    // LOSING detection
+    if (bottomQuarter || isLast) {
+      const isPlummeting = relativeDelta < -10 || 
+        (metrics.lastThreeRoundsDelta < -15 && scoreVariance > 10);
+      return {
+        situation: 'LOSING',
+        subCategory: isPlummeting ? 'PLUMMETING' : 'STRUGGLING'
       };
     }
 
