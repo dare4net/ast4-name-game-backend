@@ -18,28 +18,30 @@ const handleTimerEnd = (socket, io) => {
       return;
     }
 
-    // Create immediate dummy name validations for faster UI transition
-    game.nameValidations = [];
-    const submissions = game.submissions || {};
-    Object.entries(submissions).forEach(([playerId, playerSubmissions]) => {
-      if (playerSubmissions.names && playerSubmissions.names.trim().length > 0) {
-        game.nameValidations.push({
-          word: playerSubmissions.names,
-          playerId,
-          votes: {},
-          aiOpinion: "pending",
-          finalResult: "",
-          extract: "Validation in progress..."
-        });
-      }
-    });
-
-    // Switch to validation phase immediately
-    game.phase = "validation";
-    game.voteLength = (game.players.length - 1) * game.nameValidations.length;
-    io.to(game.id).emit("gameStateUpdate", game);
-
     try {
+    
+    // Create immediate dummy name validations for faster UI transition
+        game.nameValidations = [];
+        const submissions = game.submissions || {};
+        Object.entries(submissions).forEach(([playerId, playerSubmissions]) => {
+          if (playerSubmissions.names && playerSubmissions.names.trim().length > 0) {
+            game.nameValidations.push({
+              word: playerSubmissions.names,
+              playerId,
+              votes: {},
+              aiOpinion: "pending",
+              finalResult: "",
+              extract: "Validation in progress..."
+            });
+          }
+        });
+
+        // Switch to validation phase immediately
+        game.phase = "validation";
+        game.voteLength = (game.players.length - 1) * game.nameValidations.length;
+        io.to(game.id).emit("gameStateUpdate", game);
+
+    
       // Get all validated submissions (now returns a Map<playerId, {names, ...otherCategories}>)
       const submittedCount = Object.keys(game.submissions).length;
       const validatedResults = await submissionQueue.getGameResults(gameId, submittedCount);

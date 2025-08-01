@@ -33,7 +33,7 @@ class AICommentaryService {
       const metrics = PlayerProfileManager.calculateMetrics(profile, player, round, allScores, allDeltas, game);
       
       // Analyze situation
-      const { situation, subCategory } = PlayerProfileManager.analyzeSituation(metrics, game, currentRoundIdx);
+      const { situation, subCategory } = PlayerProfileManager.analyzeSituation(profile, metrics, game, currentRoundIdx);
       profile.situation = situation;
       profile.subCategory = subCategory;
       

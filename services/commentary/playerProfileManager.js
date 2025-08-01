@@ -13,7 +13,32 @@ class PlayerProfileManager {
   }
 
   static calculateMetrics(profile, player, round, allScores, allDeltas, game) {
-    const roundScore = round.scores[player.id] || 0;
+    // Calculate base round score
+    let roundScore = round.scores[player.id] || 0;
+    
+    // Add extra bonus points from the round if they exist
+    if (round.extraBonuses) {
+      // Add fastest submission bonus
+      if (round.extraBonuses.fastestSubmission?.playerId === player.id) {
+        roundScore += round.extraBonuses.fastestSubmission.point;
+      }
+      
+      // Add rare words bonus
+      const rareWordsBonus = round.extraBonuses.rareWords?.find(rw => rw.playerId === player.id);
+      if (rareWordsBonus) {
+        roundScore += rareWordsBonus.point;
+      }
+      
+      // Add longest word bonus
+      if (round.extraBonuses.longestWord?.playerId === player.id) {
+        roundScore += round.extraBonuses.longestWord.point;
+      }
+      
+      // Add master bonus
+      if (round.extraBonuses.master?.playerId === player.id) {
+        roundScore += round.extraBonuses.master.point;
+      }
+    }
     
     // Sort players by score for accurate positioning
     const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score);
@@ -97,7 +122,7 @@ class PlayerProfileManager {
     }
   }
 
-  static analyzeSituation(metrics, game, currentRoundIdx) {
+  static analyzeSituation(profile, metrics, game, currentRoundIdx) {
     const { 
       percentile, scoreGapToFirst, relativeDelta, scoreVariance,
       position, totalPlayers, scoreGapToNext, scoreGapToPrev,
@@ -160,6 +185,38 @@ class PlayerProfileManager {
       }
     }
 
+
+
+    //moving comeback detection here
+    // ⬇️ COMEBACK detection (after DRAW, before WINNING/LOSING/NEUTRAL)
+    const wasDominantBefore = profile?.lastSituation?.main === 'WINNING' &&
+                              profile?.lastSituation?.sub === 'DOMINANT';
+
+    const notEligibleForComeback = wasDominantBefore || isFirst;
+
+    const strongMomentum = relativeDelta * 1.5 > 15 || 
+      (metrics.lastThreeRoundsDelta / (scoreGapToFirst || 1)) > 0.3;
+
+    const moderateMomentum = relativeDelta * 1.5 > 5 || 
+      (metrics.lastThreeRoundsDelta / (scoreGapToFirst || 1)) > 0.15;
+
+    const wasStrugglingBefore =
+      profile?.lastSituation?.main === 'LOSING' ||
+      profile?.lastSituation?.main === 'NEUTRAL' ||
+      profile?.lastSituation?.sub === 'STRUGGLING' ||
+      profile?.lastSituation?.sub === 'PLUMMETING';
+
+    if (!notEligibleForComeback) {
+      if (wasStrugglingBefore && strongMomentum) {
+        return { situation: 'COMEBACK', subCategory: 'STRONG' };
+      } else if (wasStrugglingBefore && moderateMomentum) {
+        return { situation: 'COMEBACK', subCategory: 'POTENTIAL' };
+      }
+    }
+
+
+
+
     // Standard situation analysis
     //old algo
     /*if (percentile <= 25) {
@@ -201,16 +258,16 @@ class PlayerProfileManager {
   }
 
     // Middle pack analysis with momentum
-    const momentumFactor = relativeDelta * 1.5;
-    const gapClosingRate = metrics.lastThreeRoundsDelta / (scoreGapToFirst || 1);
+    //const momentumFactor = relativeDelta * 1.5;
+    //const gapClosingRate = metrics.lastThreeRoundsDelta / (scoreGapToFirst || 1);
     
-    if (momentumFactor > 15 || (gapClosingRate > 0.3 && scoreGapToFirst < 20)) {
+    /*if (momentumFactor > 15 || (gapClosingRate > 0.3 && scoreGapToFirst < 20)) {
       return { situation: 'COMEBACK', subCategory: 'STRONG' };
     } 
     
     if (momentumFactor > 5 || gapClosingRate > 0.15) {
       return { situation: 'COMEBACK', subCategory: 'POTENTIAL' };
-    }
+    }*/
     
     if (scoreVariance < 5 && Math.abs(relativeDelta) < 5) {
       return { situation: 'NEUTRAL', subCategory: 'CONSISTENT' };
