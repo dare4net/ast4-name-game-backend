@@ -3,9 +3,9 @@ const CommentHistoryManager = require('./historyManager');
 
 class CommentaryGenerator {
   static getRandomComment(gameId, playerId, situation, subCategory, type, params = {}) {
-    // Initialize player-specific comment history for this type
-    const historyKey = `${situation}.${subCategory}.${type}`;
-    const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, playerId, historyKey);
+    // Initialize game-level comment history for this type
+    const historyKey = `GAME.${situation}.${subCategory}.${type}`;
+    const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, 'GLOBAL', historyKey);
     
     // Try to get comments for the specific situation and subcategory
     let options = SITUATIONS[situation]?.[subCategory]?.[type];
@@ -36,11 +36,53 @@ class CommentaryGenerator {
       return '';
     }
     
-    // For bonus comments, we'll just randomly select without tracking history
-    const comment = comments[Math.floor(Math.random() * comments.length)];
+    // Initialize game-level bonus comment history
+    const historyKey = `GAME.BONUS.${bonusType}`;
+    const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, 'GLOBAL', historyKey);
+
+    // Validate parameters like we do for regular comments
+    const processedParams = this.validateAndProcessParams(params);
+    if (!processedParams) {
+      console.warn('Invalid parameters for bonus comment');
+      return '';
+    }
+
+    // Helper function to check if a bonus comment is valid
+    const isCommentValid = (comment) => {
+      const paramPattern = /\{([^}]+)\}/g;
+      let match;
+      while ((match = paramPattern.exec(comment)) !== null) {
+        const paramName = match[1];
+        if (processedParams[paramName] === undefined || processedParams[paramName] === null) {
+          console.log(`[Bonus Commentary Debug] Rejected: "${comment}" - Missing parameter: ${paramName}`);
+          return false;
+        }
+      }
+      return true;
+    };
+
+    // Filter valid comments
+    const validComments = comments.filter(isCommentValid);
+    if (validComments.length === 0) {
+      console.warn(`No valid comments found for bonus type ${bonusType}`);
+      return '';
+    }
+
+    // Try to find unused valid comments
+    let availableComments = validComments.filter(comment => !usedComments.includes(comment));
+    
+    // If all valid comments have been used, reset history for valid comments
+    if (availableComments.length === 0) {
+      usedComments.length = 0;  // Clear the array
+      availableComments = validComments;
+    }
+
+    // Select a random valid comment and track it
+    const comment = availableComments[Math.floor(Math.random() * availableComments.length)];
+    usedComments.push(comment);
     
     // Replace parameters in the comment
-    return Object.entries(params).reduce((text, [key, value]) => {
+    return Object.entries(processedParams).reduce((text, [key, value]) => {
       if (value === null || value === undefined) return text;
       return text.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value));
     }, comment);

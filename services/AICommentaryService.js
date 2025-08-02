@@ -157,7 +157,7 @@ class AICommentaryService {
           commentary += CommentaryGenerator.getRandomBonusComment(
             game.id, 
             'FASTEST', 
-            completeParams
+            { ...completeParams, playerId: player.id }
           ) + ' ';
         }
         
@@ -165,7 +165,7 @@ class AICommentaryService {
           commentary += CommentaryGenerator.getRandomBonusComment(
             game.id, 
             'LONGEST_WORD', 
-            { ...completeParams, word: longestWord.word }
+            { ...completeParams, playerId: player.id, word: longestWord.word }
           ) + ' ';
         }
         
@@ -173,7 +173,7 @@ class AICommentaryService {
           commentary += CommentaryGenerator.getRandomBonusComment(
             game.id, 
             'RARE_WORDS', 
-            completeParams
+            { ...completeParams, playerId: player.id }
           ) + ' ';
         }
         
@@ -181,7 +181,7 @@ class AICommentaryService {
           commentary += CommentaryGenerator.getRandomBonusComment(
             game.id, 
             'MASTER', 
-            { ...completeParams, letter: round.letter }
+            { ...completeParams, playerId: player.id, letter: round.letter }
           );
         }
       }

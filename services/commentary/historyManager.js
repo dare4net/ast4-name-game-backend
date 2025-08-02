@@ -8,29 +8,19 @@ class CommentHistoryManager {
       return {};
     }
 
-    if (!game.playerProfiles) {
-      game.playerProfiles = {};
+    // Initialize global comment history for the game if it doesn't exist
+    if (!game.globalCommentHistory) {
+      game.globalCommentHistory = {
+        comments: {},
+        bonusComments: {}
+      };
     }
 
-    if (!game.players) {
-      console.error(`No players found in game ${gameId}`);
-      return game.playerProfiles;
-    }
-    
-    // Initialize comment history as part of player profiles
-    game.players.forEach(player => {
-      if (!player || !player.id) {
-        console.error('Invalid player object:', player);
-        return;
+    return {
+      'GLOBAL': {
+        commentHistory: game.globalCommentHistory
       }
-
-      // Initialize profile if it doesn't exist
-      if (!game.playerProfiles[player.id]) {
-        game.playerProfiles[player.id] = this.initializeProfile();
-      }
-    });
-
-    return game.playerProfiles;
+    };
   }
 
   static initializeProfile() {
@@ -51,23 +41,13 @@ class CommentHistoryManager {
 
   static getOrInitializeHistory(gameId, playerId, historyKey) {
     const profiles = this.initializeCommentHistory(gameId);
-    if (!profiles[playerId]) {
-      console.error(`Profile not found for player ${playerId} in game ${gameId}`);
-      return [];
-    }
-
-    const profile = profiles[playerId];
-    if (!profile.commentHistory || !profile.commentHistory.comments) {
-      profile.commentHistory = {
-        comments: {},
-        bonusComments: {}
-      };
+    const game = games[gameId];
+    
+    if (!game.globalCommentHistory.comments[historyKey]) {
+      game.globalCommentHistory.comments[historyKey] = [];
     }
     
-    if (!profile.commentHistory.comments[historyKey]) {
-      profile.commentHistory.comments[historyKey] = [];
-    }
-    return profile.commentHistory.comments[historyKey];
+    return game.globalCommentHistory.comments[historyKey];
   }
 
   static initializeBonusHistory(gameId, playerId, bonusType) {

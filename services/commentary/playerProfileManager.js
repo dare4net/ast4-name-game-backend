@@ -249,8 +249,15 @@ class PlayerProfileManager {
     // LOSING detection
       if (bottomQuarter || isLast) {
     const recentlyDropping = metrics.lastThreeRoundsDelta < -10 && relativeDelta < -5;
+    const wasDominantBefore = profile?.lastSituation?.main === 'WINNING' &&
+                            profile?.lastSituation?.sub === 'DOMINANT';
     //const flatOrWeak = Math.abs(lastThreeRoundsDelta) < 5 || scoreGapToNext > 30;
+    if (wasDominantBefore) {
+      return recentlyDropping ? { situation: 'LOSING', subCategory: 'PLUMMETING' }
+      : { situation: 'NEUTRAL', subCategory: 'CONSISTENT' };
 
+    }
+    
     return {
       situation: 'LOSING',
       subCategory: recentlyDropping ? 'PLUMMETING' : 'STRUGGLING'
