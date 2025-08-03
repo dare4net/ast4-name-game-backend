@@ -7,16 +7,40 @@ class CommentaryGenerator {
     const historyKey = `GAME.${situation}.${subCategory}.${type}`;
     const usedComments = CommentHistoryManager.getOrInitializeHistory(gameId, 'GLOBAL', historyKey);
     
+    console.log(`[Commentary Debug] Attempting to get comments for:`, {
+      situation,
+      subCategory,
+      type,
+      exists: Boolean(SITUATIONS[situation]?.[subCategory]?.[type])
+    });
+    
     // Try to get comments for the specific situation and subcategory
-    let options = SITUATIONS[situation]?.[subCategory]?.[type];
+    let options;
+    
+    // Handle DRAW situation separately as it's not in SITUATIONS
+    if (situation === 'DRAW') {
+      console.log('[Commentary Debug] Handling DRAW situation');
+      const drawComments = require('../../config/gameComments.json').DRAW;
+      options = drawComments?.[subCategory]?.[type];
+      console.log(`[Commentary Debug] Found DRAW comments:`, Boolean(options));
+    } else {
+      options = SITUATIONS[situation]?.[subCategory]?.[type];
+    }
     
     // If not found, try the CONSISTENT subcategory of the same situation
     if (!options && situation !== 'NEUTRAL') {
-      options = SITUATIONS[situation]?.['CONSISTENT']?.[type];
+      console.log('[Commentary Debug] Falling back to CONSISTENT subcategory');
+      if (situation === 'DRAW') {
+        const drawComments = require('../../config/gameComments.json').DRAW;
+        options = drawComments?.['GROUP']?.[type]; // Use GROUP as consistent fallback for DRAW
+      } else {
+        options = SITUATIONS[situation]?.['CONSISTENT']?.[type];
+      }
     }
     
     // If still not found, fall back to NEUTRAL.CONSISTENT
     if (!options) {
+      console.log('[Commentary Debug] Falling back to NEUTRAL.CONSISTENT');
       options = SITUATIONS['NEUTRAL']['CONSISTENT'][type];
     }
     

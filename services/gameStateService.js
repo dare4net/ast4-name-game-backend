@@ -47,7 +47,11 @@ async function saveGameStateToRedis(gameId, gameState) {
       return value;
     }));
 
-    await redis.set(`game:${gameId}:state`, JSON.stringify(stateCopy));
+    const key = `game:${gameId}:state`;
+    // Set the game state with 4-hour expiry
+    await redis.set(key, JSON.stringify(stateCopy));
+    await redis.expire(key, 4 * 60 * 60); // 4 hours in seconds
+    console.log(`[Redis] Set expiry for game ${gameId} to 4 hours`);
   } catch (err) {
     console.error(`[Redis][ERROR] saveGameStateToRedis: gameId=${gameId}`, err);
     //throw err;

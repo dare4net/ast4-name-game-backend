@@ -10,6 +10,7 @@ const transferHostTitle = require('../handlers/transferHostTitle');
 const removePlayer = require('../handlers/removePlayer');
 const interruptVoting = require('../handlers/interruptVoting');
 const rejoinGame = require('../handlers/rejoinGame');
+const restartGame = require('../handlers/restartGame');
 
 module.exports = {
   createGame,
@@ -23,4 +24,5 @@ module.exports = {
   removePlayer,
   interruptVoting,
   rejoinGame,
+  restartGame,
 };
