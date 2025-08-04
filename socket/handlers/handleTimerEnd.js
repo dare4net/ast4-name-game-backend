@@ -19,31 +19,68 @@ const handleTimerEnd = (socket, io) => {
     }
 
     try {
-    
-    // Create immediate dummy name validations for faster UI transition
-        game.nameValidations = [];
-        const submissions = game.submissions || {};
-        Object.entries(submissions).forEach(([playerId, playerSubmissions]) => {
-          if (playerSubmissions.names && playerSubmissions.names.trim().length > 0) {
-            game.nameValidations.push({
-              word: playerSubmissions.names,
-              playerId,
-              votes: {},
-              aiOpinion: "pending",
-              finalResult: "",
-              extract: "Validation in progress..."
-            });
+      // Check if there are any submissions at all
+      const submissions = game.submissions || {};
+      const submittedCount = Object.keys(submissions).length;
+      
+      if (submittedCount === 0) {
+        console.log("⚠️ No submissions received for this round");
+        // Move directly to next round
+        game.currentRound += 1;
+        game.phase = "letter-selection";
+        
+        // If this was the last round
+        const maxRounds = game.maxRound;
+        if (game.currentRound >= maxRounds) {
+          game.phase = "finished";
+          try {
+            await saveGameStateToMemory(gameId, game);
+            await saveGameStateToRedis(gameId, game);
+            console.log("✅ Game state updated in Memory (handleTimerEnd - no submissions)");
+          } catch (err) {
+            console.error("❌ Failed to update game state in Memory (handleTimerEnd - no submissions):", err);
           }
+        } else {
+          // Set up next turn
+          const nextTurnId = game.players[game.currentRound % game.players.length].id;
+          game.nextTurn = game.players.find(player => player.id === nextTurnId);
+        }
+        
+        // Clear any existing submissions and push empty round results
+        game.submissions = {};
+        game.roundResults.push({
+          letter: game.currentLetter,
+          submissions: [],
+          scores: {}
         });
+        
+        io.to(game.id).emit("gameStateUpdate", game);
+        return;
+      }
+    
+      // Create immediate dummy name validations for faster UI transition
+      game.nameValidations = [];
+      Object.entries(submissions).forEach(([playerId, playerSubmissions]) => {
+        if (playerSubmissions.names && playerSubmissions.names.trim().length > 0) {
+          game.nameValidations.push({
+            word: playerSubmissions.names,
+            playerId,
+            votes: {},
+            aiOpinion: "pending",
+            finalResult: "",
+            extract: "Validation in progress..."
+          });
+        }
+      });
 
-        // Switch to validation phase immediately
+      // Switch to validation phase immediately if there are name validations
+      if (game.nameValidations.length > 0) {
         game.phase = "validation";
         game.voteLength = (game.players.length - 1) * game.nameValidations.length;
         io.to(game.id).emit("gameStateUpdate", game);
-
+      }
     
-      // Get all validated submissions (now returns a Map<playerId, {names, ...otherCategories}>)
-      const submittedCount = Object.keys(game.submissions).length;
+      // Get all validated submissions
       const validatedResults = await submissionQueue.getGameResults(gameId, submittedCount);
       if (!validatedResults) {
         console.error("❌ No validated results found for game:", gameId);
@@ -299,7 +336,7 @@ const handleTimerEnd = (socket, io) => {
       // Ensure we maintain validation phase and other critical state
       const gameStateForUpdate = {
         ...game,
-        phase: "validation",  // Ensure we stay in validation phase
+        //phase: "validation",  // Ensure we stay in validation phase
         nameValidations: game.nameValidations, // Keep name validations
         roundResults: game.roundResults,
         voteLength: game.voteLength

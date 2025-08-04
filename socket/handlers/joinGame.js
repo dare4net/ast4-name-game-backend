@@ -53,10 +53,9 @@ const joinGame = (socket, io) => {
         if (playerName && playerName !== existingPlayer.name) {
           existingPlayer.name = playerName;
         }
-        trackPlayerSession(existingPlayer.id, {
+        await trackPlayerSession(existingPlayer.id, {
           gameId,
           playerName: existingPlayer.name,
-
           isHost: existingPlayer.isHost,
           socketId: socket.id,
         });
@@ -87,7 +86,7 @@ const joinGame = (socket, io) => {
       socket.join(gameId);
 
       // Track the session
-      trackPlayerSession(playerId, {
+      await trackPlayerSession(playerId, {
         gameId,
         playerName,
         playerId: newPlayer.id, // Use the player's persistent id

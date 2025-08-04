@@ -13,10 +13,18 @@ const restartGame = (socket, io) => {
         return;
       }
 
+      // Check if the requesting player is the host
+      const requestingPlayer = game.players.find(player => player.socketId === socket.id);
+      if (!requestingPlayer || !requestingPlayer.isHost) {
+        console.error("❌ Unauthorized restart attempt. Only the host can restart the game:", socket.id);
+        if (callback) callback({ success: false, message: "Only the host can restart the game" });
+        return;
+      }
+
       // Store current players
       const currentPlayers = game.players.map(player => ({
         ...player,
-        isReady: false,
+        isReady: true,
         hasSubmitted: false,
         stats: {
           uniqueWords: 0,

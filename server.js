@@ -11,7 +11,7 @@ const server = http.createServer(app);
 // Middleware
 app.use(cors());
 app.use(express.json());
- console.log = () => {};
+ //console.log = () => {};
 
 // Routes
 app.get('/', (req, res) => {

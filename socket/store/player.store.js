@@ -1,8 +1,25 @@
+const { getGame, updateGameState } = require('./game.store');
+
 /**
  * Tracks active player sessions and their game assignments.
  * This helps with reconnection and prevents duplicate players.
  */
 const playerSessions = new Map();
+
+// Store Socket.IO server instance
+let ioInstance = null;
+
+// Constants for activity tracking
+const ACTIVITY_CHECK_INTERVAL = 30 * 1000; // Check every 30 seconds
+const INACTIVE_THRESHOLD = 60 * 1000; // 1 minute without activity marks as inactive
+
+/**
+ * Initialize the player store with Socket.IO instance
+ * @param {Object} io - The Socket.IO server instance
+ */
+const initializeStore = (io) => {
+    ioInstance = io;
+};
 
 /**
  * Store a player's session information
@@ -13,16 +30,41 @@ const playerSessions = new Map();
  * @param {string} sessionInfo.playerName - The player's name
  * @param {boolean} sessionInfo.isHost - Whether the player is the host
  */
-const trackPlayerSession = (playerId, { gameId, playerName, isHost }) => {
-    console.log(`📝 Tracking session for player ${playerName} (id: ${playerId}, socket: ) in game ${gameId} is he the host? ${isHost}`);
+const trackPlayerSession = async (playerId, { gameId, playerName, isHost, socketId }) => {
+    if (!ioInstance) {
+        console.error('Socket.IO instance not initialized in player store');
+        return;
+    }
+
+    console.log(`📝 Tracking session for player ${playerName} (id: ${playerId}, socket: ${socketId}) in game ${gameId} is he the host? ${isHost}`);
+    
+    // Update session tracking
     playerSessions.set(playerId, {
         gameId,
         playerId,
         playerName,
         isHost,
-        lastSeen: Date.now()
+        socketId,
+        lastActivity: Date.now(),
+        isActive: true
     });
-    //console.log(`📝 Tracking session for player ${playerName} (id: ${playerId}, socket: ) in game ${gameId}`);
+
+    // Update player status in game state
+    const gameState = getGame(gameId);
+    if (gameState && gameState.players) {
+        const player = gameState.players.find(p => p.id === playerId);
+        if (player) {
+            player.status = 'active';
+            await updateGameState(gameId, gameState);
+        }
+    }
+
+    // Notify others in the game about the new active player
+    ioInstance.to(gameId).emit('playerStatusUpdate', {
+        playerId,
+        isActive: true,
+        status: 'active'
+    });
     console.log(`get new player session: ${JSON.stringify(playerSessions.get(playerId))} using playerId: ${playerId}`);
 };
 
@@ -97,11 +139,87 @@ const isPlayerIdAvailable = (playerId, gameId) => {
     );
 };
 
+/**
+ * Update a player's activity timestamp
+ * @param {string} playerId - The player's id
+ * @param {Object} io - The Socket.IO server instance
+ * @returns {boolean} - Whether the player session was found and updated
+ */
+const updatePlayerActivity = (playerId) => {
+    if (!ioInstance) {
+        console.error('Socket.IO instance not initialized in player store');
+        return false;
+    }
+
+    const session = playerSessions.get(playerId);
+    if (session) {
+        const wasInactive = !session.isActive;
+        session.lastActivity = Date.now();
+        session.isActive = true;
+        
+        // If player was inactive before, notify others they're now active
+        if (wasInactive) {
+            ioInstance.to(session.gameId).emit('playerStatusUpdate', {
+                playerId: session.playerId,
+                isActive: true
+            });
+            console.log(`✅ Player ${session.playerName} is now active`);
+        }
+        return true;
+    }
+    return false;
+};
+
+/**
+ * Check all players' activity status and update accordingly
+ * @param {Object} io - The Socket.IO server instance
+ */
+const checkPlayersActivity = () => {
+    if (!ioInstance) {
+        console.error('Socket.IO instance not initialized in player store');
+        return;
+    }
+
+    const now = Date.now();
+    for (const [playerId, session] of playerSessions.entries()) {
+        // If no activity within threshold
+        if (now - session.lastActivity > INACTIVE_THRESHOLD) {
+            // Mark as inactive if was previously active
+            if (session.isActive) {
+                session.isActive = false;
+                console.log(`⚠️ Player ${session.playerName} marked as inactive`);
+                // Notify other players in the game
+                ioInstance.to(session.gameId).emit('playerStatusUpdate', {
+                    playerId: session.playerId,
+                    isActive: false
+                });
+            }
+        }
+    }
+};
+
+/**
+ * Start the activity checking system
+ * @param {Object} io - The Socket.IO server instance
+ */
+const startActivityChecking = (io) => {
+    // Initialize the store with the io instance
+    initializeStore(io);
+    
+    // Check for inactive players periodically
+    setInterval(() => {
+        checkPlayersActivity();
+    }, ACTIVITY_CHECK_INTERVAL);
+};
+
 module.exports = {
     playerSessions,
     trackPlayerSession,
     removePlayerSession,
     getPlayerSession,
     findPlayerSession,
-    isPlayerIdAvailable
+    isPlayerIdAvailable,
+    updatePlayerActivity,
+    startActivityChecking,
+    initializeStore
 };

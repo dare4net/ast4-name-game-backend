@@ -251,11 +251,17 @@ class PlayerProfileManager {
     const recentlyDropping = metrics.lastThreeRoundsDelta < -10 && relativeDelta < -5;
     const wasDominantBefore = profile?.lastSituation?.main === 'WINNING' &&
                             profile?.lastSituation?.sub === 'DOMINANT';
-    //const flatOrWeak = Math.abs(lastThreeRoundsDelta) < 5 || scoreGapToNext > 30;
+    const wasLosingBefore = profile?.lastSituation?.main === 'LOSING';
+    
+    // Check for comeback if they were losing before
+    if (wasLosingBefore && metrics.lastThreeRoundsDelta > 0) {
+      return { situation: 'COMEBACK', subCategory: 'POTENTIAL' };
+    }
+
+    // Handle previously dominant players differently
     if (wasDominantBefore) {
       return recentlyDropping ? { situation: 'LOSING', subCategory: 'PLUMMETING' }
       : { situation: 'NEUTRAL', subCategory: 'CONSISTENT' };
-
     }
     
     return {
