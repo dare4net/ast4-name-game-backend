@@ -28,6 +28,8 @@ const initializeSocket = (server) => {
     socket.on("removePlayer", gameEvents.removePlayer(socket, io));
     socket.on("interruptVoting", gameEvents.interruptVoting(socket, io));
     socket.on("rejoinGame", gameEvents.rejoinGame(socket, io));
+    socket.on("getGameState", gameEvents.getGameState(socket, io));
+    socket.on("restartGame", gameEvents.restartGame(socket, io));
 
     // Register chat and room events
     socket.on("chatMessage", chatEvents.handleChatMessage(socket, io));

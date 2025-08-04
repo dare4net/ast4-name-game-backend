@@ -12,7 +12,7 @@ async function importAnimals() {
     try {
         // Read the JSON file
         const animalsData = JSON.parse(
-            fs.readFileSync(path.join(__dirname, '../../../animals_300.json'), 'utf-8')
+            fs.readFileSync(path.join(__dirname, '../../../generic_places_1000.json'), 'utf-8')
         );
 
         // Connect to MongoDB

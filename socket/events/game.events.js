@@ -11,6 +11,7 @@ const removePlayer = require('../handlers/removePlayer');
 const interruptVoting = require('../handlers/interruptVoting');
 const rejoinGame = require('../handlers/rejoinGame');
 const restartGame = require('../handlers/restartGame');
+const getGameState = require('../handlers/getGameState');
 
 module.exports = {
   createGame,
@@ -25,4 +26,5 @@ module.exports = {
   interruptVoting,
   rejoinGame,
   restartGame,
+  getGameState,
 };
