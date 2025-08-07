@@ -46,7 +46,7 @@ class DictionaryService {
   }
 
   static async validateWord(word, category) {
-    if (!word || word.trim().length === 0) return { isValid: false, extract: '', rare: false };
+    if (!word || word.trim().length <= 1) return { isValid: false, extract: '', rare: false };
 
     const normalizedWord = word.toLowerCase().trim();
     const cacheKey = `${normalizedWord}-${category}`;

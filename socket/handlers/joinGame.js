@@ -40,7 +40,7 @@ const joinGame = (socket, io) => {
       }
 
       // Check if game is full
-      if (game.players.length >= (game.settings?.maxPlayers || 8)) {
+      if (game.players.length >= 4) {
         callback({ success: false, message: "Game is full" });
         return;
       }

@@ -106,9 +106,13 @@ const handleTimerEnd = (socket, io) => {
         return;
       }
 
-      // Process results and calculate scores
+      // Initialize round result tracking
       const allSubmissions = [];
       const scores = {};
+      const roundResult = {
+        extraBonuses: {},
+        scores: {}
+      };
       // Don't reset nameValidations here as we already have the dummy ones
       const playerCategoryValidations = new Map(); // Track validations per player
 
@@ -239,8 +243,60 @@ const handleTimerEnd = (socket, io) => {
         }
       }
 
-      // Update player stats based on validated submissions
-      console.log("\n📊 Starting stats calculation in handleTimerEnd");
+      // Calculate extra bonuses and update player stats
+      console.log("\n📊 Starting stats calculation and bonus processing in handleTimerEnd");
+      
+      // Process fastest submission
+      const fastestPlayer = game.players.reduce((fastest, player) => {
+        const currentPlayerTime = player.stats.submissionTimes?.[player.stats.submissionTimes.length - 1];
+        const fastestTime = fastest?.stats.submissionTimes?.[fastest.stats.submissionTimes.length - 1];
+        
+        if (!currentPlayerTime) return fastest;
+        if (!fastest || !fastestTime || currentPlayerTime < fastestTime) {
+          return player;
+        }
+        return fastest;
+      }, null);
+
+      if (fastestPlayer) {
+        const submissionTime = fastestPlayer.stats.submissionTimes[fastestPlayer.stats.submissionTimes.length - 1];
+        roundResult.extraBonuses.fastestSubmission = {
+          playerId: fastestPlayer.id,
+          point: 5,
+          submissionTime: submissionTime
+        };
+        fastestPlayer.score += 5;
+        console.log(`   ⚡ Fastest submission bonus: ${fastestPlayer.name} (${submissionTime}ms, +5 points)`);
+      }
+
+      
+
+      // Process longest word bonus
+      const longestSubmission = allSubmissions.reduce((longest, submission) => {
+        if (!submission.word || submission.category === 'names' || !submission.isValid) return longest;
+        if (!longest || submission.word.length > longest.word.length) {
+          return {
+            playerId: submission.playerId,
+            word: submission.word,
+            category: submission.category
+          };
+        }
+        return longest;
+      }, null);
+
+      if (longestSubmission) {
+        roundResult.extraBonuses.longestWord = {
+          playerId: longestSubmission.playerId,
+          point: 5,
+          word: longestSubmission.word,
+          category: longestSubmission.category
+        };
+        const player = game.players.find(p => p.id === longestSubmission.playerId);
+        player.score += 5;
+        console.log(`   📏 Longest word bonus: ${player.name} ("${longestSubmission.word}" in ${longestSubmission.category}, +5 points)`);
+      }
+
+      // Update other player stats
       for (const [playerId, validatedSubmissions] of validatedResults.entries()) {
         const player = game.players.find(p => p.id === playerId);
         if (!player) {
@@ -291,6 +347,30 @@ const handleTimerEnd = (socket, io) => {
           }
         }
 
+
+        // Process rare words bonus
+      const rareWordsBonus = game.players.map(player => {
+        const rareWordsThisRound = player.stats.rareWords?.filter(rw => rw.round === game.currentRound) || [];
+        if (rareWordsThisRound.length > 0) {
+          const points = rareWordsThisRound.length * 5;
+          player.score += points;
+          return {
+            playerId: player.id,
+            rareWords: rareWordsThisRound.map(rw => ({ word: rw.word, category: rw.category })),
+            point: points
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+      if (rareWordsBonus.length > 0) {
+        roundResult.extraBonuses.rareWords = rareWordsBonus;
+        rareWordsBonus.forEach(bonus => {
+          const player = game.players.find(p => p.id === bonus.playerId);
+          console.log(`   💫 Rare words bonus: ${player.name} (${bonus.rareWords.map(rw => rw.word).join(', ')}, +${bonus.point} points)`);
+        });
+      }
+
         /*const playerValidations = playerCategoryValidations.get(playerId);
         console.log(`\n   📈 Round Summary for ${player.name}:`);
         console.log(`      Longest word this round: ${longestThisRound.word} (${longestThisRound.length} chars)`);
@@ -308,9 +388,10 @@ const handleTimerEnd = (socket, io) => {
         letter: game.currentLetter,
         submissions: allSubmissions,
         scores,
+        extraBonuses: roundResult.extraBonuses
       };
 
-      game.roundResults.push(roundResults);
+      //game.roundResults.push(roundResults);
       
       // Ensure voteLength is maintained
       game.voteLength = (game.players.length - 1) * game.nameValidations.length;
@@ -323,14 +404,7 @@ const handleTimerEnd = (socket, io) => {
       // Clear the submission queue for this game
       submissionQueue.clearGame(gameId);
 
-      // Save updated state to Memory
-      try {
-        saveGameStateToMemory(gameId, game);
-        saveGameStateToRedis(gameId, game);
-        console.log("✅ Game state updated in Memory (handleTimerEnd)");
-      } catch (err) {
-        console.error("❌ Failed to update game state in Memory (handleTimerEnd):", err);
-      }
+      
 
       console.log("✅ Round processed successfully for all players:", roundResults.letter);
       // Ensure we maintain validation phase and other critical state
@@ -338,7 +412,7 @@ const handleTimerEnd = (socket, io) => {
         ...game,
         //phase: "validation",  // Ensure we stay in validation phase
         nameValidations: game.nameValidations, // Keep name validations
-        roundResults: game.roundResults,
+        //roundResults: game.roundResults,
         voteLength: game.voteLength
       };
 
@@ -346,6 +420,18 @@ const handleTimerEnd = (socket, io) => {
       console.log("VoteLength before update:", game.voteLength);
       console.log("This is the updated nameValidations: ", game.nameValidations);
       io.to(gameId).emit("gameStateUpdate", gameStateForUpdate);
+      game.roundResults.push(roundResults);
+      // Mark round results as ready and save state
+      game.roundResultReady = true;
+      console.log("✅ Round results ready for validation phase");
+
+      try {
+        saveGameStateToMemory(gameId, game);
+        saveGameStateToRedis(gameId, game);
+        console.log("✅ Game state updated in Memory (handleTimerEnd)");
+      } catch (err) {
+        console.error("❌ Failed to update game state in Memory (handleTimerEnd):", err);
+      }
     } catch (error) {
       console.error("❌ Error processing round results:", error);
     }

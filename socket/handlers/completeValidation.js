@@ -6,17 +6,16 @@ const { saveGameStateToMemory } = require('../../services/gameStateMemoryService
 const completeValidation = (game, io) => {
   console.log("📤 Validation complete for game:", game.id);
   
-  // Check if roundResult is available
-  //i'm coming back here, this mehod isnt sustainable for checks
-  const roundResultIndex = game.roundResults.length - 1;
-  const roundResult = game.roundResults[roundResultIndex];
-  
-  if (!roundResult) {
-    console.log("⏳ Waiting for round results to be available...");
+  // Check if round results are ready
+  if (!game.roundResultReady) {
+    console.log("⏳ Waiting for round results to be ready...");
     // Try again in 1 second
     setTimeout(() => completeValidation(game, io), 1000);
     return;
   }
+  game.roundResultReady = false;
+  const roundResultIndex = game.roundResults.length - 1;
+  const roundResult = game.roundResults[roundResultIndex];
   
   const master = game.nextTurn;
   game.nameValidations.forEach(validation => {
@@ -59,128 +58,44 @@ const completeValidation = (game, io) => {
   io.to(game.id).emit("gameStateUpdate", game);
         
   
-  // Update final player stats after name validation
-  console.log("\n📊 Starting final stats calculation in completeValidation");
+  // Process perfect rounds and letter mastery
+  console.log("\n📊 Processing perfect rounds and letter mastery");
   const maxPossibleScore = (game.selectedCategories.length * 10); // 10 points per category + 10 for name
-  console.log(`🎯 Max possible score for this round: ${maxPossibleScore}`);
-  
 
   Object.entries(roundResult.scores).forEach(([id, score]) => {
     const player = game.players.find(p => p.id === id);
     if (!player) {
-      console.warn(`⚠️ Player ${id} not found for final stats calculation`);
+      console.warn(`⚠️ Player ${id} not found for stats calculation`);
       return;
     }
 
-    console.log(`\n👤 Processing final stats for ${player.name}:`);
-    console.log(`   Current round score: ${score}/${maxPossibleScore}`);
-    console.log(`   Previous stats:`, JSON.stringify(player.stats, null, 2));
-
     // Initialize stats if needed
     if (!player.stats) {
-      console.log(`   ⚙️ Initializing stats for player ${player.name}`);
       player.stats = {
         perfectRounds: 0,
-        uniqueWords: player.stats?.uniqueWords || 0,
-        allSubmittedWords: player.stats?.allSubmittedWords || new Set()
+        letterMastered: [],
+        kingBonus: 0
       };
     }
 
-    // Update perfect rounds count
+    // Check for perfect round and letter mastery
     if (score === maxPossibleScore) {
       player.stats.perfectRounds = (player.stats.perfectRounds || 0) + 1;
-      player.stats.letterMastered.push(roundResult.letter);
+      
+      // If this was their turn and they got a perfect round, they mastered the letter
+      if (master && id === master.id) {
+        player.stats.letterMastered.push(roundResult.letter);
+        roundResult.extraBonuses.master = {
+          playerId: master.id,
+          point: 10,
+          letter: roundResult.letter
+        };
+        master.score += 10;
+        master.stats.kingBonus += 1;
+        console.log(`   👑 Master bonus: ${master.name} (perfect round with letter ${roundResult.letter}, +10 points)`);
+      }
+      
       console.log(`   🌟 PERFECT ROUND! ${player.name} now has ${player.stats.perfectRounds} perfect rounds`);
-    } else {
-      console.log(`   📝 Regular round completion (${score}/${maxPossibleScore} points)`);
-    }
-
-    // Initialize extra bonuses object outside the player loop
-    if (!roundResult.extraBonuses) {
-      roundResult.extraBonuses = {};
-
-      // Process fastest submission
-      const fastestPlayer = game.players.reduce((fastest, player) => {
-        const currentPlayerTime = player.stats.submissionTimes?.[player.stats.submissionTimes.length - 1];
-        const fastestTime = fastest?.stats.submissionTimes?.[fastest.stats.submissionTimes.length - 1];
-        
-        if (!currentPlayerTime) return fastest;
-        if (!fastest || !fastestTime || currentPlayerTime < fastestTime) {
-          return player;
-        }
-        return fastest;
-      }, null);
-
-      if (fastestPlayer) {
-        const submissionTime = fastestPlayer.stats.submissionTimes[fastestPlayer.stats.submissionTimes.length - 1];
-        roundResult.extraBonuses.fastestSubmission = {
-          playerId: fastestPlayer.id,
-          point: 5,
-          submissionTime: submissionTime // Include the actual submission time
-        };
-        fastestPlayer.score += 5;
-        console.log(`   ⚡ Fastest submission bonus: ${fastestPlayer.name} (${submissionTime}ms, +5 points)`);
-      }
-
-      // Process rare words bonus
-      const rareWordsBonus = game.players.map(player => {
-        const rareWordsThisRound = player.stats.rareWords?.filter(rw => rw.round === game.currentRound - 1) || [];
-        if (rareWordsThisRound.length > 0) {
-          const points = rareWordsThisRound.length * 5;
-          player.score += points;
-          return {
-            playerId: player.id,
-            rareWords: rareWordsThisRound.map(rw => ({ word: rw.word, category: rw.category })), // Include the actual rare words
-            point: points
-          };
-        }
-        return null;
-      }).filter(Boolean);
-
-      if (rareWordsBonus.length > 0) {
-        roundResult.extraBonuses.rareWords = rareWordsBonus;
-        rareWordsBonus.forEach(bonus => {
-          const player = game.players.find(p => p.id === bonus.playerId);
-          console.log(`   💫 Rare words bonus: ${player.name} (${bonus.rareWords.map(rw => rw.word).join(', ')}, +${bonus.point} points)`);
-        });
-      }
-
-      // Process longest word bonus
-      const longestSubmission = roundResult.submissions.reduce((longest, submission) => {
-        if (!submission.word || submission.category === 'names' || !submission.isValid) return longest;
-        if (!longest || submission.word.length > longest.word.length) {
-          return {
-            playerId: submission.playerId,
-            word: submission.word,
-            category: submission.category
-          };
-        }
-        return longest;
-      }, null);
-
-      if (longestSubmission) {
-        roundResult.extraBonuses.longestWord = {
-          playerId: longestSubmission.playerId,
-          point: 5,
-          word: longestSubmission.word,
-          category: longestSubmission.category
-        };
-        const player = game.players.find(p => p.id === longestSubmission.playerId);
-        player.score += 5;
-        console.log(`   📏 Longest word bonus: ${player.name} ("${longestSubmission.word}" in ${longestSubmission.category}, +5 points)`);
-      }
-    }
-
-    // Process master bonus - moved outside the initialization block since it depends on the current player's score
-    if (master && id === master.id && score === maxPossibleScore) {
-      roundResult.extraBonuses.master = {
-        playerId: master.id,
-        point: 10,
-        letter: roundResult.letter
-      };
-      master.score += 10;
-      master.stats.kingBonus +=1;
-      console.log(`   👑 Master bonus: ${master.name} (perfect round with letter ${roundResult.letter}, +10 points)`);
     }
 
 
