@@ -145,7 +145,7 @@ class PlayerProfileManager {
     const drawThreshold = totalPlayers <= playerThresholds.small ? 5 : 8;
 
     // Enhanced DRAW detection for max 8 players
-    if (currentRoundIdx > 2) {
+    //if (currentRoundIdx > 2) {
       // For small games (2-4 players)
       if (totalPlayers <= playerThresholds.small) {
         // In small games, more sensitive to close scores
@@ -183,7 +183,7 @@ class PlayerProfileManager {
           };
         }
       }
-    }
+    //}
 
 
 
