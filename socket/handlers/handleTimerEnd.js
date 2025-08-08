@@ -248,7 +248,7 @@ const handleTimerEnd = (socket, io) => {
       
       // Process fastest submission
       const fastestPlayer = game.players.reduce((fastest, player) => {
-        const currentPlayerTime = player.stats.submissionTimes?.[player.stats.submissionTimes.length - 1];
+        const currentPlayerTime = player.stats?.submissionTimes?.[player.stats.submissionTimes.length - 1];
         const fastestTime = fastest?.stats.submissionTimes?.[fastest.stats.submissionTimes.length - 1];
         
         if (!currentPlayerTime) return fastest;
@@ -350,7 +350,7 @@ const handleTimerEnd = (socket, io) => {
 
         // Process rare words bonus
       const rareWordsBonus = game.players.map(player => {
-        const rareWordsThisRound = player.stats.rareWords?.filter(rw => rw.round === game.currentRound) || [];
+        const rareWordsThisRound = player.stats?.rareWords?.filter(rw => rw.round === game.currentRound) || [];
         if (rareWordsThisRound.length > 0) {
           const points = rareWordsThisRound.length * 5;
           player.score += points;

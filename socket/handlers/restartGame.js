@@ -26,28 +26,36 @@ const restartGame = (socket, io) => {
         ...player,
         isReady: true,
         hasSubmitted: false,
+        score: 0,
         stats: {
-          uniqueWords: 0,
-          perfectRounds: 0,
-          allSubmittedWords: new Set(),
+          fastestSubmissions: 0,
           fastestSubmission: null,
-          longestWord: { word: '', length: 0 }
+          rareWords: [],
+          longestWord: { word: '', length: 0 },
+          perfectRounds: 0,
+          submissionTimes: [],
+          allSubmittedWords: new Set(),
+          letterMastered: [],
+          categoriesMastered: [...game.selectedCategories].map( cat => cat.id ),
+          kingBonus: 0 // Track king bonus separately
         }
       }));
 
       // Reset game state to initial state while keeping players
       const resetState = {
         id: gameId,
+        categories: game.categories,
+        selectedCategories: game.selectedCategories,
         players: currentPlayers,
         phase: "lobby",
-        categories: [],
         usedLetters: [],
         currentRound: 0,
         roundResults: [],
         submissions: {},
         voteLength: 0,
         nextTurn: currentPlayers[0], // Set first player as next turn
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        
       };
 
       // Save reset state to Redis
