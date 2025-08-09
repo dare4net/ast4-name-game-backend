@@ -39,12 +39,7 @@ const joinGame = (socket, io) => {
         return;
       }
 
-      // Check if game is full
-      if (game.players.length >= 4) {
-        callback({ success: false, message: "Game is full" });
-        return;
-      }
-
+      
       // Check if player with this id already exists (persistent id)
       const existingPlayer = game.players.find(p => p.id === player.id);
       if (existingPlayer) {
@@ -70,6 +65,13 @@ const joinGame = (socket, io) => {
         });
         return;
       }
+
+      // Check if game is full
+      if (game.players.length >= 4) {
+        callback({ success: false, message: "Game is full" });
+        return;
+      }
+
 
       // If we get here, it's a new player joining
       const newPlayer = {

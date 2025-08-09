@@ -35,7 +35,7 @@ const selectLetter = (socket, io) => {
 
       console.log("✅ Letter selected successfully:", game.id);
 
-      io.to(gameId).emit("timerUpdate", 30);
+      io.to(gameId).emit("timerUpdate", 45);
       io.to(gameId).emit("gameStateUpdate", game);
       if (callback) callback({ success: true });
     } else {
