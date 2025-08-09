@@ -32,22 +32,27 @@ function removePlayer(socket, io) {
         return;
       }
 
-      // Remove player from game state
-      const updatedPlayers = game.players.filter(player => player.id !== targetId);
-      const updatedGame = updateGameState(gameId, { players: updatedPlayers });
-
-      // Remove player from session tracking
-      removePlayerSession(targetId);
-
-      // Notify the removed player
+      // First, remove player from socket room and tracking
       const targetSocket = io.sockets.sockets.get(targetId);
       if (targetSocket) {
         targetSocket.leave(gameId);
         targetSocket.emit('playerRemoved', { message: 'You have been removed from the game by the host' });
       }
+      removePlayerSession(targetId);
+
+      // Then update game state
+      const updatedPlayers = game.players.filter(player => player.id !== targetId);
+      await updateGameState(gameId, { players: updatedPlayers });
+      
+      // Get fresh game state and convert to plain object
+      const freshGame = getGame(gameId);
+      const gameStateForUpdate = {
+        ...freshGame,
+        players: [...freshGame.players]  // Ensure players array is also a fresh copy
+      };
 
       // Broadcast updated game state to remaining players
-      io.to(gameId).emit('gameStateUpdate', updatedGame);
+      io.to(gameId).emit('gameStateUpdate', gameStateForUpdate);
 
       console.log(`🚫 Player removed from game: ${targetId} by host ${playerId}`);
     } catch (error) {

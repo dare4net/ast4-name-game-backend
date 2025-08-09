@@ -75,15 +75,21 @@ const updatePlayerStats = (game, playerId, submissions, validatedSubmissions, su
 
 const submitWords = (socket, io) => {
   return async ({ gameId, playerId, submissions }) => {
-    console.log("📤 Handling word submissions:", { gameId, playerId, submissions });
     const game = games[gameId];
+
+    const player = game.players.find(p => p.id === playerId);
+    if (!player) {
+      console.error("❌ Player not found for submitWords:", playerId);
+      return;
+    }
+
+    console.log("📤 Handling word submissions:", { gameId, playerId, submissions });
     
     if (game) {
       const submissionTime = Date.now();
       game.submissions[playerId] = submissions;
 
       // Mark player as submitted
-      const player = game.players.find(p => p.id === playerId);
       if (player) player.hasSubmitted = true;
       io.to(gameId).emit('gameStateUpdate', game);
 
