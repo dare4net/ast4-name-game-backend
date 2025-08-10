@@ -1,8 +1,10 @@
 const { games } = require('../store/game.store');
 const { saveGameStateToRedis } = require('../../services/gameStateService');
+const { incrementRoute } = require('../../utils/analytic');
 
 const startGame = (socket, io) => {
   return async ({ gameId, playerId }, callback) => {
+    await incrementRoute('startGame');
     console.log("🎮 Starting game:", gameId);
     const game = games[gameId];
     

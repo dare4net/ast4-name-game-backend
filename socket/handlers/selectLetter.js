@@ -1,9 +1,11 @@
 const { games } = require('../store/game.store');
 const submissionQueue = require('../../utils/submission-queue');
 const { saveGameStateToRedis } = require('../../services/gameStateService');
+const { incrementRoute } = require('../../utils/analytic');
 
 const selectLetter = (socket, io) => {
   return async ({ gameId, letter }, callback) => {
+    await incrementRoute('selectLetter');
     console.log("🎯 Letter selected:", { gameId, letter });
     const game = games[gameId];
     

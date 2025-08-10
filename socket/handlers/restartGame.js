@@ -1,8 +1,10 @@
 const { games } = require('../store/game.store');
 const { saveGameStateToRedis } = require('../../services/gameStateService');
+const { incrementRoute } = require('../../utils/analytic');
 
 const restartGame = (socket, io) => {
   return async ({ gameId }, callback) => {
+    await incrementRoute('restartGame');
     try {
       console.log("🔄 Restarting game:", gameId);
       const game = await games[gameId];

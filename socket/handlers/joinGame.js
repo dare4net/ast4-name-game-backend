@@ -1,6 +1,7 @@
 const { games } = require('../store/game.store');
 const ConnectionManager = require('../managers/connection.manager');
 const { trackPlayerSession } = require('../store/player.store');
+const { incrementRoute } = require('../../utils/analytic');
 
 // Define critical phases where joining is not allowed
 const RESTRICTED_PHASES = ['playing', 'validation', 'letter-selection'];
@@ -8,6 +9,7 @@ const RESTRICTED_PHASES = ['playing', 'validation', 'letter-selection'];
 const joinGame = (socket, io) => {
   return async ({ gameId, playerName, player }, callback) => {
     console.log("👤 Joining game:", { gameId, playerName });
+    await incrementRoute('joinGame');
     
     try {
       // First check if game exists

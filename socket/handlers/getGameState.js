@@ -1,9 +1,11 @@
 const { games } = require('../store/game.store');
+const { incrementRoute } = require('../../utils/analytic');
 
 const getGameState = (socket, io) => {
   return async ({ gameId }, callback) => {
     try {
       console.log("🎮 Fetching game state for:", gameId);
+      await incrementRoute('getGameState');
       
       const game = await games[gameId];
       

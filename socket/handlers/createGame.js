@@ -4,9 +4,11 @@ const {
   saveInitialGameStateToMongo,
   saveGameStateToRedis
 } = require('../../services/gameStateService');
+const { incrementRoute } = require('../../utils/analytic');
 
 const createGame = (socket, io) => {
   return async ({ gameId, playerName, categories, player }, callback) => {
+    await incrementRoute('createGame');
     console.log("🎮 Creating new game:", { gameId, playerName, categories });
 
     // Ensure we have a valid gameId
